@@ -11,7 +11,7 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
   const [formData, setFormData] = useState<Omit<User, 'id' | 'created_at' | 'updated_at'> & { password?: string }>({
     email: initialData?.email || '',
     full_name: initialData?.full_name || '',
-    role: initialData?.role || 'viewer',
+    role: initialData?.role || 'driver',
     is_active: initialData?.is_active ?? true,
     password: '',
   });
@@ -29,7 +29,7 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
       setFormData({
         email: '',
         full_name: '',
-        role: 'viewer',
+        role: 'driver',
         is_active: true,
         password: '',
       });
@@ -131,11 +131,12 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
             required
             className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
           >
-            <option value="viewer">Viewer</option>
+            <option value="">Select a role</option>
             <option value="driver">Driver</option>
-            <option value="maintenance_manager">Maintenance Manager</option>
+            <option value="maintenance_team">Maintenance Team</option>
             <option value="fleet_manager">Fleet Manager</option>
-            <option value="administration">Administrator</option>
+            <option value="administration">Administration</option>
+            <option value="client_company_liaison">Client Company Liaison</option>
           </select>
           <p className="mt-1 text-xs text-slate-500">
             Determines access level and permissions

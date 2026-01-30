@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
 import { 
   UserRole, 
   Permission, 
@@ -35,48 +34,33 @@ export function useRoleAccess() {
 
     async function initRole() {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        // Get user from localStorage (custom auth)
+        const userId = localStorage.getItem('user_id');
+        const userEmail = localStorage.getItem('user_email');
+        const roleStr = localStorage.getItem('user_role');
+
+        console.log('useRoleAccess - Reading from localStorage:', { userId, userEmail, roleStr });
+        console.log('Valid roles are:', ['fleet_manager', 'maintenance_team', 'driver', 'administration', 'client_company_liaison']);
 
         if (!mounted) return;
 
-        if (userError || !user) {
+        if (!userId || !userEmail || !roleStr) {
+          console.error('Missing localStorage data:', { userId: !!userId, userEmail: !!userEmail, roleStr: !!roleStr });
           setUserRole(null);
           setLoading(false);
           return;
         }
 
-        // Fetch user role from user_roles table
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role, client_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (!mounted) return;
-
-        if (roleError) {
-          console.error('Error fetching user role:', roleError);
-          setUserRole(null);
-          setLoading(false);
-          return;
-        }
-
-        if (!roleData) {
-          console.warn('No role found for user:', user.email);
-          setUserRole(null);
-          setLoading(false);
-          return;
-        }
-
-        if (isValidRole(roleData.role)) {
+        if (isValidRole(roleStr)) {
+          console.log('✓ Role is valid:', roleStr);
           setUserRole({
-            userId: user.id,
-            email: user.email!,
-            role: roleData.role as UserRole,
-            clientId: roleData.client_id,
+            userId,
+            email: userEmail,
+            role: roleStr as UserRole,
           });
         } else {
-          console.error('Invalid role:', roleData.role);
+          console.error('✗ Invalid role from localStorage:', roleStr);
+          console.error('This role is not in the allowed list. User needs role updated in database.');
           setUserRole(null);
         }
         setLoading(false);
@@ -91,52 +75,40 @@ export function useRoleAccess() {
 
     initRole();
 
-    // Subscribe to auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
-      if (!mounted) return;
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        initRole();
-      } else if (event === 'SIGNED_OUT') {
-        setUserRole(null);
-        setLoading(false);
-      }
-    });
+    // Listen for storage events (for multi-tab support)
+    const handleStorageChange = () => {
+      initRole();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       mounted = false;
-      authListener.subscription.unsubscribe();
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
   async function loadUserRole() {
     // Manual refresh function - kept for backward compatibility
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
+      const roleStr = localStorage.getItem('user_role');
 
-      if (userError || !user) {
+      if (!userId || !userEmail || !roleStr) {
         setUserRole(null);
         return;
       }
 
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role, client_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (roleError || !roleData) {
-        setUserRole(null);
-        return;
-      }
-
-      if (isValidRole(roleData.role)) {
+      if (isValidRole(roleStr)) {
         setUserRole({
-          userId: user.id,
-          email: user.email!,
-          role: roleData.role as UserRole,
-          clientId: roleData.client_id,
+          userId,
+          email: userEmail,
+          role: roleStr as UserRole,
         });
+      } else {
+        console.error('Invalid role:', roleStr);
+        setUserRole(null);
       }
     } catch (error) {
       console.error('Error refreshing user role:', error);

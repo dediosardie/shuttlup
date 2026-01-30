@@ -9,9 +9,10 @@ type ViewMode = 'login' | 'signup' | 'forgot-password' | 'reset-password';
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('login');
-  const [email, setEmail] = useState('admin@dentistahub.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -43,28 +44,34 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       if (viewMode === 'login') {
         const { user, error: signInError } = await authService.signIn(email, password);
         
+        console.log('Login result:', { user, error: signInError });
+        
         if (signInError) {
-          setError(signInError.message || 'Failed to sign in');
+          setError(signInError || 'Failed to sign in');
         } else if (user) {
+          console.log('Login successful, calling onLoginSuccess');
           onLoginSuccess();
+        } else {
+          console.error('No user or error returned from signIn');
+          setError('Login failed - please try again');
         }
       } else if (viewMode === 'signup') {
-        const { user, error: signUpError } = await authService.signUp(email, password);
+        const { user, error: signUpError } = await authService.signUp(email, password, fullName);
         
         if (signUpError) {
-          setError(signUpError.message || 'Failed to sign up');
+          setError(signUpError || 'Failed to sign up');
         } else if (user) {
-          setSuccessMessage('Account created successfully! Please check your email to verify your account.');
+          setSuccessMessage('Account created successfully! Your account is pending approval from an administrator.');
           setTimeout(() => {
             setViewMode('login');
             setSuccessMessage('');
-          }, 3000);
+          }, 5000);
         }
       } else if (viewMode === 'reset-password') {
         const { error: updateError } = await authService.updatePassword(password);
         
         if (updateError) {
-          setError(updateError.message || 'Failed to update password');
+          setError(updateError || 'Failed to update password');
         } else {
           setSuccessMessage('Password updated successfully!');
           setTimeout(() => {
@@ -97,7 +104,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       const { error: resetError } = await authService.forgotPassword(email);
       
       if (resetError) {
-        setError(resetError.message || 'Failed to send reset email');
+        setError(resetError || 'Failed to send reset email');
       } else {
         setSuccessMessage('Password reset email sent! Check your inbox.');
         setTimeout(() => {
@@ -186,6 +193,24 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                   required
                 />
               </div>
+
+              {/* Full Name Field (only for signup) */}
+              {viewMode === 'signup' && (
+                <div>
+                  <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    id="fullName"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
+              )}
 
               {/* Password Field (not shown in forgot-password) */}
               {viewMode !== 'forgot-password' && (

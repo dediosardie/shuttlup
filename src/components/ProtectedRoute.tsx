@@ -3,10 +3,12 @@
  * 
  * Enforces role-based access control at the route level.
  * Renders children only if user has required permissions.
+ * Uses cached page restrictions from usePageAccess hook for instant checks.
  */
 
 import React from 'react';
 import { useRoleAccess } from '../hooks/useRoleAccess';
+import { usePageAccess } from '../hooks/usePageAccess';
 import { Permission, Module, UserRole } from '../config/rolePermissions';
 
 interface ProtectedRouteProps {
@@ -15,6 +17,7 @@ interface ProtectedRouteProps {
   requiredModule?: Module;
   requiredRole?: UserRole;
   requiredRoles?: UserRole[];
+  pagePath?: string; // Page path to check against cached page restrictions
   fallback?: React.ReactNode;
 }
 
@@ -24,17 +27,24 @@ export function ProtectedRoute({
   requiredModule,
   requiredRole,
   requiredRoles,
+  pagePath,
   fallback = <AccessDenied />,
 }: ProtectedRouteProps) {
   const { userRole, loading, hasPermission, hasModuleAccess, hasRole, hasAnyRole } = useRoleAccess();
+  const { hasPageAccess: checkPageAccess, loading: pageAccessLoading } = usePageAccess();
 
-  // Show loading state
-  if (loading) {
+  // Show loading state only during initial load
+  if (loading || pageAccessLoading) {
     return <LoadingScreen />;
   }
 
   // Not authenticated
   if (!userRole) {
+    return fallback;
+  }
+
+  // Check page-level restrictions using cached data (instant, no flash)
+  if (pagePath && !checkPageAccess(pagePath)) {
     return fallback;
   }
 

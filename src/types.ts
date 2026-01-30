@@ -23,7 +23,7 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'fleet_manager' | 'maintenance_manager' | 'driver' | 'viewer';
+  role: 'fleet_manager' | 'maintenance_team' | 'driver' | 'administration' | 'client_company_liaison';
   is_active: boolean;
   session_id?: string | null;
   created_at?: string;
@@ -255,4 +255,20 @@ export interface DisposalTransfer {
   final_odometer: number;
   transfer_status: 'pending_payment' | 'pending_documents' | 'completed';
   notes?: string;
+}
+
+// Page Restrictions Module
+export interface PageRestriction {
+  id: string;
+  page_name: string;
+  page_path: string;
+  description?: string;
+  fleet_manager_access: boolean;
+  maintenance_team_access: boolean;
+  driver_access: boolean;
+  administration_access: boolean;
+  client_company_liaison_access: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }

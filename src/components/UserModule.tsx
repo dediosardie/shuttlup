@@ -4,7 +4,6 @@ import UserTable from './UserTable';
 import UserForm from './UserForm';
 import Modal from './Modal';
 import { userService } from '../services/supabaseService';
-import { supabase } from '../supabaseClient';
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
 
@@ -23,12 +22,9 @@ export default function UserModule() {
 
   const getCurrentUserRole = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const userData = await userService.getByEmail(user.email || '');
-        if (userData) {
-          setCurrentUserRole(userData.role);
-        }
+      const userRole = localStorage.getItem('user_role');
+      if (userRole) {
+        setCurrentUserRole(userRole);
       }
     } catch (error) {
       console.error('Error getting current user role:', error);

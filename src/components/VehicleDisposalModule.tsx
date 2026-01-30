@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { DisposalRequest, DisposalAuction, Bid, Vehicle } from '../types';
 import Modal from './Modal';
 import { disposalService, vehicleService } from '../services/supabaseService';
-import { supabase } from '../supabaseClient';
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
 
@@ -76,10 +75,10 @@ export default function VehicleDisposalModule() {
     });
 
     useEffect(() => {
-      const getCurrentUser = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && !formData.requested_by) {
-          setFormData(prev => ({ ...prev, requested_by: user.id }));
+      const getCurrentUser = () => {
+        const userId = localStorage.getItem('user_id');
+        if (userId && !formData.requested_by) {
+          setFormData(prev => ({ ...prev, requested_by: userId }));
         }
       };
       getCurrentUser();
@@ -90,9 +89,9 @@ export default function VehicleDisposalModule() {
       
       // Ensure we have the current user ID
       if (!formData.requested_by) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          onSubmit({ ...formData, requested_by: user.id });
+        const userId = localStorage.getItem('user_id');
+        if (userId) {
+          onSubmit({ ...formData, requested_by: userId });
         } else {
           alert('Unable to get current user. Please try logging in again.');
         }

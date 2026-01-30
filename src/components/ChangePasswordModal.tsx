@@ -41,7 +41,7 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
       const { error: updateError } = await authService.updatePassword(newPassword);
       
       if (updateError) {
-        setError(updateError.message || 'Failed to update password');
+        setError(updateError || 'Failed to update password');
       } else {
         setSuccessMessage('Password updated successfully!');
         setTimeout(() => {

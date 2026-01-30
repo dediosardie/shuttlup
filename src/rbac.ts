@@ -39,7 +39,6 @@ export { authService } from './services/authService';
 export type {
   AuthResponse,
   AuthState,
-  UserWithRole,
 } from './services/authService';
 
 /**

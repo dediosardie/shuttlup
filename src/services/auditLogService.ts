@@ -25,14 +25,10 @@ class AuditLogService {
 
   async createLog(action: string, details: string, changes?: { before?: any; after?: any }) {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // Get user from localStorage (custom auth)
+      const userEmail = localStorage.getItem('user_email');
       
-      if (userError) {
-        console.error('Error getting user for audit log:', userError);
-        return null;
-      }
-
-      if (!user) {
+      if (!userEmail) {
         console.warn('No authenticated user for audit log');
         return null;
       }
@@ -71,7 +67,7 @@ class AuditLogService {
       }
       
       const logEntry = {
-        user_email: user.email || 'unknown',
+        user_email: userEmail,
         action,
         details: enhancedDetails,
         timestamp: new Date().toISOString()

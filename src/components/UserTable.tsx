@@ -22,16 +22,16 @@ export default function UserTable({ users, onDelete, onEdit, onToggleStatus }: U
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-800';
       case 'fleet_manager':
         return 'bg-blue-100 text-blue-800';
-      case 'maintenance_manager':
+      case 'maintenance_team':
         return 'bg-emerald-100 text-emerald-800';
       case 'driver':
         return 'bg-amber-100 text-amber-800';
-      case 'viewer':
-        return 'bg-slate-100 text-slate-800';
+      case 'administration':
+        return 'bg-purple-100 text-purple-800';
+      case 'client_company_liaison':
+        return 'bg-cyan-100 text-cyan-800';
       default:
         return 'bg-slate-100 text-slate-800';
     }

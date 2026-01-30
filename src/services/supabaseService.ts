@@ -45,43 +45,24 @@ export const userService = {
   },
 
   async create(user: Omit<User, 'id' | 'created_at' | 'updated_at'> & { password?: string }): Promise<User> {
-    // First, create the auth user if password is provided
-    let userId: string | undefined;
-    
-    if (user.password) {
-      // Create auth.users entry via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: user.email,
-        password: user.password,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          full_name: user.full_name,
-          role: user.role,
-        }
-      });
-      
-      if (authError) throw new Error(`Failed to create auth user: ${authError.message}`);
-      if (!authData.user) throw new Error('No user returned from auth creation');
-      
-      userId = authData.user.id;
+    if (!user.password) {
+      throw new Error('Password is required for new users');
     }
-    
-    // Remove password from user object before saving to public.users
-    const { password, ...userWithoutPassword } = user;
-    
-    // Create public.users entry with the same UUID if auth user was created
-    const userData = userId 
-      ? { ...userWithoutPassword, id: userId }
-      : userWithoutPassword;
-    
+
+    // Call the database function to create user with hashed password
     const { data, error } = await supabase
-      .from('users')
-      .insert([userData])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
+      .rpc('create_user_account', {
+        p_email: user.email,
+        p_password: user.password,
+        p_full_name: user.full_name,
+        p_role: user.role || 'viewer',
+        p_is_active: user.is_active ?? true
+      });
+
+    if (error) throw new Error(`Failed to create user: ${error.message}`);
+    if (!data || data.length === 0) throw new Error('No user returned from creation');
+
+    return data[0];
   },
 
   async update(id: string, user: Partial<User>): Promise<User> {

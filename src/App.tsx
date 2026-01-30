@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
 import { Vehicle } from './types';
 import { notificationService, Notification } from './services/notificationService';
 import VehicleModule from './components/VehicleModule';
@@ -12,17 +11,19 @@ import ComplianceDocumentModule from './components/ComplianceDocumentModule';
 import VehicleDisposalModule from './components/VehicleDisposalModule';
 import ReportingAnalyticsDashboard from './components/ReportingAnalyticsDashboard';
 import UserModule from './components/UserModule';
+import PageRestrictionModule from './components/PageRestrictionModule';
 import LoginPage from './components/LoginPage';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import { ProtectedRoute, RoleBadge } from './components/ProtectedRoute';
 import { useRoleAccess } from './hooks/useRoleAccess';
+import { usePageAccess } from './hooks/usePageAccess';
 import { authService } from './services/authService';
 import { Module } from './config/rolePermissions';
 
-type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users';
+type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users' | 'page_restrictions';
 
 function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -35,26 +36,18 @@ function App() {
 
   // Role-based access control
   const { userRole, loading: roleLoading, hasModuleAccess } = useRoleAccess();
+  const { hasPageAccess, loading: pageAccessLoading } = usePageAccess();
 
   // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
-      // Clear any existing session on initial load
-      await authService.signOut();
-      setUser(null);
+      // Check if there's a valid session
+      const { user: sessionUser } = await authService.getSession();
+      setUser(sessionUser);
       setAuthLoading(false);
     };
 
     checkAuth();
-
-    // Subscribe to auth changes
-    const subscription = authService.onAuthStateChange((user) => {
-      setUser(user);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   useEffect(() => {
@@ -85,8 +78,13 @@ function App() {
     setShowUserMenu(false);
   };
 
-  const handleLoginSuccess = () => {
-    // User state will be updated by the auth state listener
+  const handleLoginSuccess = async () => {
+    // Fetch the current user session after successful login
+    console.log('handleLoginSuccess called');
+    const { user: sessionUser, error } = await authService.getSession();
+    console.log('Session result:', { user: sessionUser, error });
+    setUser(sessionUser);
+    setAuthLoading(false);
   };
 
   const handleDismissNotification = (id: number) => {
@@ -106,7 +104,7 @@ function App() {
   const unreadCount = notifications.filter(n => n.unread).length;
 
   // Show loading spinner while checking auth
-  if (authLoading || roleLoading) {
+  if (authLoading || roleLoading || pageAccessLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center">
@@ -157,79 +155,71 @@ function App() {
     );
   }
 
-  const getPageTitle = () => {
-    switch (activeModule) {
-      case 'vehicles': return 'Vehicle Management';
-      case 'drivers': return 'Driver Management';
-      case 'maintenance': return 'Maintenance Schedule';
-      case 'trips': return 'Trip Scheduling & Routes';
-      case 'fuel': return 'Fuel Tracking & Efficiency';
-      case 'incidents': return 'Incidents & Insurance';
-      case 'compliance': return 'Compliance & Documents';
-      case 'disposal': return 'Vehicle Disposal Management';
-      case 'reporting': return 'Dashboard';
-      case 'users': return 'User Management';
-      default: return 'Dashboard';
-    }
-  };
 
   const navItems = [
-        { id: 'reporting' as ActiveModule, module: 'analytics' as Module, label: 'Dashboard', icon: (
+        { id: 'reporting' as ActiveModule, module: 'analytics' as Module, path: '/reports', label: 'Dashboard', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
       </svg>
     )},
-    { id: 'vehicles' as ActiveModule, module: 'vehicles' as Module, label: 'Vehicles', icon: (
+    { id: 'vehicles' as ActiveModule, module: 'vehicles' as Module, path: '/vehicles', label: 'Vehicles', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
       </svg>
     )},
-    { id: 'drivers' as ActiveModule, module: 'drivers' as Module, label: 'Drivers', icon: (
+    { id: 'drivers' as ActiveModule, module: 'drivers' as Module, path: '/drivers', label: 'Drivers', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     )},
-    { id: 'trips' as ActiveModule, module: 'trips' as Module, label: 'Trips', icon: (
+    { id: 'trips' as ActiveModule, module: 'trips' as Module, path: '/trips', label: 'Trips', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
       </svg>
     )},
 
-    { id: 'users' as ActiveModule, module: 'users' as Module, label: 'Users', icon: (
+    { id: 'users' as ActiveModule, module: 'users' as Module, path: '/users', label: 'Users', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
       </svg>
     )},
-    { id: 'maintenance' as ActiveModule, module: 'maintenance' as Module, label: 'Maintenance', icon: (
+    { id: 'page_restrictions' as ActiveModule, module: 'users' as Module, path: '/page-restrictions', label: 'Page Access', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    )},
+    { id: 'maintenance' as ActiveModule, module: 'maintenance' as Module, path: '/maintenance', label: 'Maintenance', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     )},
-    { id: 'fuel' as ActiveModule, module: 'fuel' as Module, label: 'Fuel Tracking', icon: (
+    { id: 'fuel' as ActiveModule, module: 'fuel' as Module, path: '/fuel', label: 'Fuel Tracking', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     )},
-    { id: 'incidents' as ActiveModule, module: 'incidents' as Module, label: 'Incidents', icon: (
+    { id: 'incidents' as ActiveModule, module: 'incidents' as Module, path: '/incidents', label: 'Incidents', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     )},
-    { id: 'compliance' as ActiveModule, module: 'compliance' as Module, label: 'Compliance', icon: (
+    { id: 'compliance' as ActiveModule, module: 'compliance' as Module, path: '/compliance', label: 'Compliance', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )},
-    { id: 'disposal' as ActiveModule, module: 'disposal' as Module, label: 'Disposal', icon: (
+    { id: 'disposal' as ActiveModule, module: 'disposal' as Module, path: '/disposal', label: 'Disposal', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
       </svg>
     )},
   ];
 
-  // Filter nav items based on role access
-  const accessibleNavItems = navItems.filter(item => hasModuleAccess(item.module));
+  // Filter nav items based on role access and page restrictions
+  const accessibleNavItems = navItems.filter(item => 
+    hasModuleAccess(item.module) && hasPageAccess(item.path)
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -256,7 +246,19 @@ function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-lg font-semibold text-slate-900 hidden sm:block">{getPageTitle()}</h1>
+            <h1 className="text-lg font-semibold text-slate-900 hidden sm:block">
+              {activeModule === 'vehicles' && 'Vehicle Management'}
+              {activeModule === 'drivers' && 'Driver Management'}
+              {activeModule === 'maintenance' && 'Maintenance'}
+              {activeModule === 'trips' && 'Trip Scheduling'}
+              {activeModule === 'fuel' && 'Fuel Tracking'}
+              {activeModule === 'incidents' && 'Incidents & Insurance'}
+              {activeModule === 'compliance' && 'Compliance Documents'}
+              {activeModule === 'disposal' && 'Vehicle Disposal'}
+              {activeModule === 'reporting' && 'Reporting & Analytics'}
+              {activeModule === 'users' && 'User Management'}
+              {activeModule === 'page_restrictions' && 'Page Restrictions'}
+            </h1>
           </div>
 
           {/* Center: Search */}
@@ -506,7 +508,7 @@ function App() {
               )}
               <div className="space-y-1">
                 {accessibleNavItems
-                  .filter(item => ['reporting', 'vehicles', 'drivers', 'trips', 'users'].includes(item.id))
+                  .filter(item => ['reporting', 'vehicles', 'drivers', 'trips', 'users', 'page_restrictions'].includes(item.id))
                   .map((item) => (
                     <button
                       key={item.id}
@@ -595,53 +597,58 @@ function App() {
         <main className="flex-1 overflow-auto bg-slate-50">
           <div className="p-4 md:p-6 lg:p-8">
             {activeModule === 'vehicles' && (
-              <ProtectedRoute requiredModule="vehicles">
+              <ProtectedRoute requiredModule="vehicles" pagePath="/vehicles">
                 <VehicleModule />
               </ProtectedRoute>
             )}
             {activeModule === 'drivers' && (
-              <ProtectedRoute requiredModule="drivers">
+              <ProtectedRoute requiredModule="drivers" pagePath="/drivers">
                 <DriverModule />
               </ProtectedRoute>
             )}
             {activeModule === 'maintenance' && (
-              <ProtectedRoute requiredModule="maintenance">
+              <ProtectedRoute requiredModule="maintenance" pagePath="/maintenance">
                 <MaintenanceModule vehicles={vehicles.map(v => ({ id: v.id, plate_number: v.plate_number }))} />
               </ProtectedRoute>
             )}
             {activeModule === 'trips' && (
-              <ProtectedRoute requiredModule="trips">
+              <ProtectedRoute requiredModule="trips" pagePath="/trips">
                 <TripModule />
               </ProtectedRoute>
             )}
             {activeModule === 'fuel' && (
-              <ProtectedRoute requiredModule="fuel">
+              <ProtectedRoute requiredModule="fuel" pagePath="/fuel">
                 <FuelTrackingModule />
               </ProtectedRoute>
             )}
             {activeModule === 'incidents' && (
-              <ProtectedRoute requiredModule="incidents">
+              <ProtectedRoute requiredModule="incidents" pagePath="/incidents">
                 <IncidentInsuranceModule />
               </ProtectedRoute>
             )}
             {activeModule === 'compliance' && (
-              <ProtectedRoute requiredModule="compliance">
+              <ProtectedRoute requiredModule="compliance" pagePath="/compliance">
                 <ComplianceDocumentModule />
               </ProtectedRoute>
             )}
             {activeModule === 'disposal' && (
-              <ProtectedRoute requiredModule="disposal">
+              <ProtectedRoute requiredModule="disposal" pagePath="/disposal">
                 <VehicleDisposalModule />
               </ProtectedRoute>
             )}
             {activeModule === 'reporting' && (
-              <ProtectedRoute requiredModule="analytics">
+              <ProtectedRoute requiredModule="analytics" pagePath="/reports">
                 <ReportingAnalyticsDashboard />
               </ProtectedRoute>
             )}
             {activeModule === 'users' && (
-              <ProtectedRoute requiredModule="users">
+              <ProtectedRoute requiredModule="users" pagePath="/users">
                 <UserModule />
+              </ProtectedRoute>
+            )}
+            {activeModule === 'page_restrictions' && (
+              <ProtectedRoute pagePath="/page-restrictions">
+                <PageRestrictionModule />
               </ProtectedRoute>
             )}
           </div>

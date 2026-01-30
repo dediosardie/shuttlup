@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Incident, InsuranceClaim, Vehicle, Driver } from '../types';
 import Modal from './Modal';
 import { incidentService, insuranceService, vehicleService, driverService } from '../services/supabaseService';
-import { supabase } from '../supabaseClient';
+
 // Format currency with Php prefix
 const formatCurrency = (amount: number): string => {
   return `Php ${amount.toLocaleString('en-US', {
@@ -244,9 +244,9 @@ export default function IncidentInsuranceModule() {
   // Action: Report Incident (primary, submit) - per markdown
   const handleSaveIncident = async (incidentData: any) => {
     try {
-      // Get current user ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get current user ID from localStorage
+      const userId = localStorage.getItem('user_id');
+      if (!userId) {
         alert('You must be logged in to report an incident.');
         return;
       }
@@ -254,7 +254,7 @@ export default function IncidentInsuranceModule() {
       // Add reported_by field
       const incidentWithReporter = {
         ...incidentData,
-        reported_by: user.id,
+        reported_by: userId,
       };
       
       const newIncident = await incidentService.create(incidentWithReporter);
