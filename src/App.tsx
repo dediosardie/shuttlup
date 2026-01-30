@@ -48,6 +48,32 @@ function App() {
     };
 
     checkAuth();
+
+    // Handle session expiration
+    const handleSessionExpired = async () => {
+      console.log('Session expired event received');
+      await authService.clearSession();
+      setUser(null);
+      alert('Your session has expired. Please log in again.');
+    };
+
+    // Handle session replacement (logged in from another device)
+    const handleSessionReplaced = async () => {
+      console.log('Session replaced event received');
+      await authService.clearSession();
+      setUser(null);
+      alert('Your account has been logged in from another device. You have been logged out.');
+    };
+
+    // Add event listeners
+    window.addEventListener('session-expired', handleSessionExpired as any);
+    window.addEventListener('session-replaced', handleSessionReplaced as any);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired as any);
+      window.removeEventListener('session-replaced', handleSessionReplaced as any);
+    };
   }, []);
 
   useEffect(() => {
@@ -85,6 +111,10 @@ function App() {
     console.log('Session result:', { user: sessionUser, error });
     setUser(sessionUser);
     setAuthLoading(false);
+    
+    // Trigger storage event manually to update useRoleAccess hook
+    // (storage events don't fire in the same tab that made the change)
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleDismissNotification = (id: number) => {

@@ -10,9 +10,13 @@ export interface AuthState {
   loading: boolean;
 }
 
+// Session configuration
+const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
+
 /**
  * Authentication Service
- * Handles custom authentication using public.users table
+ * Handles custom authentication with session expiration and concurrent login management
  */
 export const authService = {
   /**
@@ -52,21 +56,17 @@ export const authService = {
         };
       }
 
-      // Check for existing session (single device login)
-      if (user.session_id) {
-        return {
-          user: null,
-          error: 'Account is already logged in from another device. Please log out from the other device first.',
-        };
-      }
-
-      // Generate session token
+      // Generate new session token (this will replace any existing session)
       const sessionToken = `session_${user.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const expiresAt = new Date(Date.now() + SESSION_DURATION).toISOString();
 
-      // Update session_id in database
+      // Update session_id in database (replaces existing session if any)
       const { error: updateError } = await supabase
         .from('users')
-        .update({ session_id: sessionToken })
+        .update({ 
+          session_id: sessionToken,
+          session_expires_at: expiresAt
+        })
         .eq('id', user.id);
 
       if (updateError) {
@@ -83,7 +83,11 @@ export const authService = {
       localStorage.setItem('user_id', user.id);
       localStorage.setItem('user_email', user.email);
       localStorage.setItem('user_role', user.role);
+      localStorage.setItem('session_expires_at', expiresAt);
       console.log('Stored in localStorage - user_role:', localStorage.getItem('user_role'));
+
+      // Start session monitoring
+      this.startSessionMonitoring();
 
       return {
         user: {
@@ -157,15 +161,23 @@ export const authService = {
         // Clear session_id from database
         await supabase
           .from('users')
-          .update({ session_id: null })
+          .update({ 
+            session_id: null,
+            session_expires_at: null
+          })
           .eq('id', userId);
       }
 
-      // Clear localStorage
+      // Stop session monitoring
+      this.stopSessionMonitoring();
+
+      // Clear all session data from localStorage
       localStorage.removeItem('session_token');
       localStorage.removeItem('user_id');
       localStorage.removeItem('user_email');
       localStorage.removeItem('user_role');
+      localStorage.removeItem('session_expires_at');
+      sessionStorage.clear();
 
       return { error: null };
     } catch (error: any) {
@@ -232,42 +244,57 @@ export const authService = {
       const sessionToken = localStorage.getItem('session_token');
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
-      const userRole = localStorage.getItem('user_role');
+      const expiresAt = localStorage.getItem('session_expires_at');
 
       if (!sessionToken || !userId || !userEmail) {
         return { user: null, error: 'No active session' };
       }
 
-      // Verify session in database (optional verification)
+      // Check if session has expired
+      if (expiresAt && new Date(expiresAt) < new Date()) {
+        console.log('Session expired');
+        await this.signOut();
+        return { user: null, error: 'Session expired. Please log in again.' };
+      }
+
+      // Verify session in database
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, full_name, role, is_active')
+        .select('id, email, full_name, role, is_active, session_id, session_expires_at')
         .eq('id', userId)
-        .eq('session_id', sessionToken)
         .maybeSingle();
 
       if (error) {
         console.error('Session verification error:', error);
-        // Return user from localStorage even if DB check fails
-        return {
-          user: {
-            id: userId,
-            email: userEmail,
-            role: userRole,
-            full_name: userEmail.split('@')[0],
-            is_active: true,
-          },
-          error: null,
-        };
+        return { user: null, error: 'Failed to verify session' };
       }
 
       if (!data) {
-        // Clear invalid session
-        localStorage.removeItem('session_token');
-        localStorage.removeItem('user_id');
-        localStorage.removeItem('user_email');
-        localStorage.removeItem('user_role');
-        return { user: null, error: 'Invalid or expired session' };
+        await this.clearSession();
+        return { user: null, error: 'User not found' };
+      }
+
+      // Check if session was replaced (different session_id in DB)
+      if (data.session_id !== sessionToken) {
+        console.log('Session replaced by another login');
+        await this.clearSession();
+        return { 
+          user: null, 
+          error: 'Your session was replaced by a login from another device.' 
+        };
+      }
+
+      // Check if session expired in database
+      if (data.session_expires_at && new Date(data.session_expires_at) < new Date()) {
+        console.log('Session expired in database');
+        await this.signOut();
+        return { user: null, error: 'Session expired. Please log in again.' };
+      }
+
+      // Check if user is inactive
+      if (!data.is_active) {
+        await this.signOut();
+        return { user: null, error: 'Your account has been deactivated.' };
       }
 
       return {
@@ -282,24 +309,6 @@ export const authService = {
       };
     } catch (error: any) {
       console.error('Get session error:', error);
-      // Fallback to localStorage
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
-      const userRole = localStorage.getItem('user_role');
-      
-      if (userId && userEmail) {
-        return {
-          user: {
-            id: userId,
-            email: userEmail,
-            role: userRole,
-            full_name: userEmail.split('@')[0],
-            is_active: true,
-          },
-          error: null,
-        };
-      }
-      
       return {
         user: null,
         error: error.message || 'An error occurred',
@@ -321,4 +330,150 @@ export const authService = {
     const { user } = await this.getSession();
     return user !== null;
   },
+
+  /**
+   * Clear session data from localStorage only (no database update)
+   */
+  clearSession() {
+    localStorage.removeItem('session_token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('session_expires_at');
+    sessionStorage.clear();
+  },
+
+  /**
+   * Session monitoring interval
+   */
+  sessionCheckInterval: null as any,
+
+  /**
+   * Start monitoring session validity
+   */
+  startSessionMonitoring() {
+    // Clear any existing interval
+    this.stopSessionMonitoring();
+
+    // Check session immediately
+    this.checkSessionValidity();
+
+    // Set up periodic checks
+    this.sessionCheckInterval = setInterval(() => {
+      this.checkSessionValidity();
+    }, SESSION_CHECK_INTERVAL);
+
+    console.log('Session monitoring started');
+  },
+
+  /**
+   * Stop monitoring session
+   */
+  stopSessionMonitoring() {
+    if (this.sessionCheckInterval) {
+      clearInterval(this.sessionCheckInterval);
+      this.sessionCheckInterval = null;
+      console.log('Session monitoring stopped');
+    }
+  },
+
+  /**
+   * Check if current session is still valid
+   */
+  async checkSessionValidity() {
+    const sessionToken = localStorage.getItem('session_token');
+    const userId = localStorage.getItem('user_id');
+    const expiresAt = localStorage.getItem('session_expires_at');
+
+    if (!sessionToken || !userId) {
+      return;
+    }
+
+    // Check local expiration
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      console.log('Session expired locally');
+      window.dispatchEvent(new CustomEvent('session-expired'));
+      return;
+    }
+
+    // Check database session
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('session_id, session_expires_at')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!data) {
+        console.log('User not found in database');
+        window.dispatchEvent(new CustomEvent('session-expired'));
+        return;
+      }
+
+      // Session was replaced
+      if (data.session_id !== sessionToken) {
+        console.log('Session replaced by another device');
+        window.dispatchEvent(new CustomEvent('session-replaced'));
+        return;
+      }
+
+      // Session expired in database
+      if (data.session_expires_at && new Date(data.session_expires_at) < new Date()) {
+        console.log('Session expired in database');
+        window.dispatchEvent(new CustomEvent('session-expired'));
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking session validity:', error);
+    }
+  },
+
+  /**
+   * Extend session expiration time
+   */
+  async extendSession(): Promise<{ error: string | null }> {
+    try {
+      const userId = localStorage.getItem('user_id');
+      const sessionToken = localStorage.getItem('session_token');
+
+      if (!userId || !sessionToken) {
+        return { error: 'No active session' };
+      }
+
+      const newExpiresAt = new Date(Date.now() + SESSION_DURATION).toISOString();
+
+      // Update database
+      const { error } = await supabase
+        .from('users')
+        .update({ session_expires_at: newExpiresAt })
+        .eq('id', userId)
+        .eq('session_id', sessionToken);
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      // Update localStorage
+      localStorage.setItem('session_expires_at', newExpiresAt);
+
+      return { error: null };
+    } catch (error: any) {
+      console.error('Extend session error:', error);
+      return { error: error.message || 'Failed to extend session' };
+    }
+  },
 };
+
+// Clear session on browser/tab close
+window.addEventListener('beforeunload', () => {
+  // Note: We don't clear the database session here because the user might just be refreshing
+  // The session will expire naturally or be replaced on next login
+});
+
+// Clear session data when page is hidden (optional - for stricter security)
+// Uncomment if you want to force re-login on tab close
+/*
+window.addEventListener('pagehide', async () => {
+  await authService.signOut();
+});
+*/
