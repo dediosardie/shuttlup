@@ -65,16 +65,44 @@ export const userService = {
     return data[0];
   },
 
-  async update(id: string, user: Partial<User>): Promise<User> {
-    const { data, error } = await supabase
-      .from('users')
-      .update(user)
-      .eq('id', id)
-      .select();
+  async update(id: string, user: Partial<User> & { password?: string }): Promise<User> {
+    // If password is provided, update it separately using the database function
+    if (user.password) {
+      const { error: passwordError } = await supabase
+        .rpc('update_user_password', {
+          p_user_id: id,
+          p_new_password: user.password
+        });
+      
+      if (passwordError) throw new Error(`Failed to update password: ${passwordError.message}`);
+      
+      // Remove password from the user object before updating other fields
+      const { password, ...userWithoutPassword } = user;
+      user = userWithoutPassword;
+    }
     
-    if (error) throw error;
-    if (!data || data.length === 0) throw new Error('User not found');
-    return data[0];
+    // Update other user fields (if any remain after removing password)
+    if (Object.keys(user).length > 0) {
+      const { data, error } = await supabase
+        .from('users')
+        .update(user)
+        .eq('id', id)
+        .select();
+      
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('User not found');
+      return data[0];
+    } else {
+      // If only password was updated, fetch and return the user
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
   },
 
   async delete(id: string): Promise<void> {
