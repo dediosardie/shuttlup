@@ -102,38 +102,42 @@ export default function UserTable({ users, onDelete, onEdit, onToggleStatus }: U
               </td>
               {(onEdit || onDelete || onToggleStatus) && (
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end gap-2">
-                    {onToggleStatus && (
-                      <Button
-                        onClick={() => onToggleStatus(user)}
-                        variant={user.is_active ? 'secondary' : 'primary'}
-                        size="sm"
-                        title={user.is_active ? 'Deactivate' : 'Activate'}
-                      >
-                        {user.is_active ? 'Deactivate' : 'Activate'}
-                      </Button>
-                    )}
-                    {onEdit && (
-                      <Button
-                        onClick={() => onEdit(user)}
-                        variant="ghost"
-                        size="sm"
-                        title="Edit User"
-                      >
-                        Edit
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        onClick={() => onDelete(user.id)}
-                        variant="danger"
-                        size="sm"
-                        title="Delete User"
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </div>
+                  {user.email !== 'dediosardie11@gmail.com' ? (
+                    <div className="flex items-center justify-end gap-2">
+                      {onToggleStatus && (
+                        <Button
+                          onClick={() => onToggleStatus(user)}
+                          variant={user.is_active ? 'secondary' : 'primary'}
+                          size="sm"
+                          title={user.is_active ? 'Deactivate' : 'Activate'}
+                        >
+                          {user.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      )}
+                      {onEdit && (
+                        <Button
+                          onClick={() => onEdit(user)}
+                          variant="ghost"
+                          size="sm"
+                          title="Edit User"
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          onClick={() => onDelete(user.id)}
+                          variant="danger"
+                          size="sm"
+                          title="Delete User"
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-text-muted italic">Protected</span>
+                  )}
                 </td>
               )}
             </tr>

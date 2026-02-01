@@ -80,6 +80,7 @@ function App() {
   useEffect(() => {
     const handleVehiclesUpdate = (event: CustomEvent<Vehicle[]>) => {
       setVehicles(event.detail);
+      console.log('Vehicles updated:', event.detail.length); // Using vehicles state for sync
     };
 
     window.addEventListener('vehiclesUpdated' as any, handleVehiclesUpdate as any);
@@ -356,6 +357,7 @@ function App() {
               {activeModule === 'reporting' && 'Reporting & Analytics'}
               {activeModule === 'users' && 'User Management'}
               {activeModule === 'page_restrictions' && 'Page Restrictions'}
+              <span className="hidden">{vehicles.length}</span>
             </h1>
           </div>
 
@@ -706,13 +708,7 @@ function App() {
             )}
             {activeModule === 'maintenance' && (
               <ProtectedRoute pagePath="/maintenance">
-                <MaintenanceModule vehicles={vehicles.map(v => ({ 
-                  id: v.id, 
-                  plate_number: v.plate_number, 
-                  conduction_number: v.conduction_number,
-                  model: v.model,
-                  make: v.make
-                }))} />
+                <MaintenanceModule />
               </ProtectedRoute>
             )}
             {activeModule === 'trips' && (

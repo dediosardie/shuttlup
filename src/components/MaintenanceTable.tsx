@@ -11,7 +11,7 @@ const formatCurrency = (amount: number): string => {
 
 interface MaintenanceTableProps {
   maintenances: Maintenance[];
-  vehicles: Array<{ id: string; plate_number: string; conduction_number?: string }>;
+  vehicles: Array<{ id: string; plate_number: string; conduction_number?: string; model: string; make: string }>;
   onMarkCompleted: (id: string) => void;
   onEdit: (maintenance: Maintenance) => void;
   onDelete: (id: string) => void;
@@ -20,7 +20,10 @@ interface MaintenanceTableProps {
 export default function MaintenanceTable({ maintenances, vehicles, onMarkCompleted, onEdit, onDelete }: MaintenanceTableProps) {
   const getVehiclePlate = (vehicleId: string) => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
-    return vehicle ? `${vehicle.plate_number}${(vehicle as any).conduction_number ? ` (${(vehicle as any).conduction_number})` : ''}` : 'N/A';
+    if (!vehicle) return 'N/A';
+    
+    const identifier = vehicle.plate_number || vehicle.conduction_number || 'Unknown';
+    return `${identifier} - ${vehicle.make} ${vehicle.model}`;
   };
 
   if (maintenances.length === 0) {

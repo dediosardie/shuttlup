@@ -1,39 +1,41 @@
 import { useState, useEffect } from 'react';
-import { Maintenance } from '../types';
+import { Maintenance, Vehicle } from '../types';
 import MaintenanceTable from './MaintenanceTable';
 import MaintenanceForm from './MaintenanceForm';
 import Modal from './Modal';
 import { Card, Button } from './ui';
-import { maintenanceStorage } from '../storage';
+import { maintenanceStorage, vehicleStorage } from '../storage';
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
 import { vehicleService } from '../services/supabaseService';
 
-interface MaintenanceModuleProps {
-  vehicles: Array<{ id: string; plate_number: string; conduction_number?: string; model: string; make: string }>;
-}
-
-export default function MaintenanceModule({ vehicles }: MaintenanceModuleProps) {
+export default function MaintenanceModule() {
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [editingMaintenance, setEditingMaintenance] = useState<Maintenance | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    // Load maintenances from storage on mount
-    const loadMaintenances = async () => {
+    // Load maintenances and vehicles from storage on mount
+    const loadData = async () => {
       try {
         setIsLoading(true);
-        const storedMaintenances = await maintenanceStorage.getAll();
+        const [storedMaintenances, storedVehicles] = await Promise.all([
+          maintenanceStorage.getAll(),
+          vehicleStorage.getAll()
+        ]);
         console.log('Loaded maintenance records:', storedMaintenances);
+        console.log('Loaded vehicles:', storedVehicles);
         setMaintenances(storedMaintenances);
+        setVehicles(storedVehicles);
       } catch (error) {
-        console.error('Error loading maintenance records:', error);
+        console.error('Error loading maintenance data:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    loadMaintenances();
+    loadData();
   }, []);
 
   // Dispatch event when maintenances update so other modules can react
