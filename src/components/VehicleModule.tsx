@@ -3,7 +3,7 @@ import { Vehicle } from '../types';
 import VehicleTable from './VehicleTable';
 import VehicleForm from './VehicleForm';
 import Modal from './Modal';
-import { vehicleService } from '../services/supabaseService';
+import { vehicleService, disposalService } from '../services/supabaseService';
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
 import { Button, Card, Input } from './ui';
@@ -139,34 +139,60 @@ export default function VehicleModule() {
     }
   };
 
-  const handleDisposeVehicle = async (id: string) => {
-    const vehicle = vehicles.find(v => v.id === id);
-    if (!confirm('Are you sure you want to dispose this vehicle? This action cannot be undone.')) {
+  const handleDisposeVehicle = async (vehicleId: string, disposalReason: string, currentMileage: number) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) {
+      notificationService.error('Error', 'Vehicle not found');
       return;
     }
-    
+
     try {
-      await vehicleService.delete(id);
-      setVehicles(vehicles.filter(v => v.id !== id));
+      // Get current user ID
+      const userId = localStorage.getItem('user_id');
+      if (!userId) {
+        notificationService.error('Error', 'User not authenticated. Please log in again.');
+        return;
+      }
+
+      // Create disposal request
+      const disposalRequest = {
+        disposal_number: `DSP-${Date.now()}`,
+        vehicle_id: vehicleId,
+        requested_by: userId,
+        disposal_reason: disposalReason as 'end_of_life' | 'excessive_maintenance' | 'accident_damage' | 'upgrade' | 'policy_change',
+        recommended_method: 'auction' as 'auction' | 'best_offer' | 'trade_in' | 'scrap' | 'donation',
+        condition_rating: 'good' as 'excellent' | 'good' | 'fair' | 'poor' | 'salvage',
+        current_mileage: currentMileage,
+        estimated_value: 0, // To be estimated by fleet manager
+        request_date: new Date().toISOString().split('T')[0],
+        status: 'pending_approval' as 'pending_approval' | 'listed' | 'bidding_open' | 'sold' | 'transferred' | 'cancelled',
+        approval_status: 'pending' as 'pending' | 'approved' | 'rejected',
+      };
+
+      const newRequest = await disposalService.createRequest(disposalRequest);
+      
+      // Update vehicle status to 'disposed' (optional - or keep as maintenance until approved)
+      // await vehicleService.update(vehicleId, { status: 'disposed' });
+      // setVehicles(vehicles.map(v => v.id === vehicleId ? { ...v, status: 'disposed' as const } : v));
       
       // Create notification
-      notificationService.info(
-        'Vehicle Disposed',
-        `${vehicle?.plate_number || 'Vehicle'} has been removed from the fleet`
+      notificationService.success(
+        'Disposal Request Created',
+        `Disposal request ${newRequest.disposal_number} for ${vehicle.plate_number} has been submitted`
       );
       
       // Create audit log
       await auditLogService.createLog(
-        'Vehicle Disposed',
-        `Disposed vehicle ${vehicle?.plate_number} (${vehicle?.make} ${vehicle?.model})`
+        'Disposal Request Created',
+        `Created disposal request ${newRequest.disposal_number} for vehicle ${vehicle.plate_number} (${vehicle.make} ${vehicle.model}) - Reason: ${disposalReason}`
       );
     } catch (error: any) {
-      console.error('Failed to dispose vehicle:', error);
+      console.error('Failed to create disposal request:', error);
       notificationService.error(
-        'Failed to Dispose Vehicle',
-        error.message || 'Unable to dispose vehicle. Please try again.'
+        'Failed to Create Disposal Request',
+        error.message || 'Unable to create disposal request. Please try again.'
       );
-      alert(error.message || 'Failed to dispose vehicle. Please try again.');
+      alert(error.message || 'Failed to create disposal request. Please try again.');
     }
   };
 

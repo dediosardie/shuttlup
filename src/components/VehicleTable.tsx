@@ -1,16 +1,33 @@
+import { useState } from 'react';
 import { Vehicle } from '../types';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button } from './ui';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, Input, Select } from './ui';
+import Modal from './Modal';
 
 interface VehicleTableProps {
   vehicles: Vehicle[];
-  onDispose: (id: string) => void;
+  onDispose: (vehicleId: string, disposalReason: string, currentMileage: number) => void;
   onEdit: (vehicle: Vehicle) => void;
 }
 
 export default function VehicleTable({ vehicles, onDispose, onEdit }: VehicleTableProps) {
+  const [isDisposalModalOpen, setIsDisposalModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [disposalReason, setDisposalReason] = useState<string>('end_of_life');
+  const [currentMileage, setCurrentMileage] = useState<number>(0);
+
   const handleDispose = (vehicle: Vehicle) => {
-    if (window.confirm(`Are you sure you want to dispose vehicle ${vehicle.plate_number}?`)) {
-      onDispose(vehicle.id);
+    setSelectedVehicle(vehicle);
+    setDisposalReason('end_of_life');
+    setCurrentMileage(0);
+    setIsDisposalModalOpen(true);
+  };
+
+  const handleSubmitDisposal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedVehicle) {
+      onDispose(selectedVehicle.id, disposalReason, currentMileage);
+      setIsDisposalModalOpen(false);
+      setSelectedVehicle(null);
     }
   };
 
@@ -29,6 +46,7 @@ export default function VehicleTable({ vehicles, onDispose, onEdit }: VehicleTab
   }
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
@@ -84,6 +102,7 @@ export default function VehicleTable({ vehicles, onDispose, onEdit }: VehicleTab
             </TableCell>
             <TableCell>
               <Badge variant={
+                vehicle.status === 'disposed' ? 'warning' :
                 vehicle.status === 'active' ? 'success' :
                 vehicle.status === 'maintenance' ? 'warning' :
                 'default'
@@ -117,5 +136,83 @@ export default function VehicleTable({ vehicles, onDispose, onEdit }: VehicleTab
         ))}
       </TableBody>
     </Table>
+
+    {/* Disposal Request Modal */}
+    <Modal 
+      isOpen={isDisposalModalOpen} 
+      onClose={() => {
+        setIsDisposalModalOpen(false);
+        setSelectedVehicle(null);
+      }} 
+      title="Create Disposal Request"
+    >
+      <form onSubmit={handleSubmitDisposal} className="space-y-4">
+        <div className="bg-accent-soft border border-border-muted rounded-lg p-4 mb-4">
+          <h4 className="text-sm font-semibold text-text-primary mb-2">Vehicle Information</h4>
+          {selectedVehicle && (
+            <div className="space-y-1">
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium">Plate Number:</span> {selectedVehicle.plate_number}
+              </p>
+              {selectedVehicle.conduction_number && (
+                <p className="text-sm text-text-secondary">
+                  <span className="font-medium">Conduction Number:</span> {selectedVehicle.conduction_number}
+                </p>
+              )}
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium">Vehicle:</span> {selectedVehicle.make} {selectedVehicle.model} ({selectedVehicle.year})
+              </p>
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium">VIN:</span> {selectedVehicle.vin}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <Select
+            label={<>Reason for Disposal <span className="text-red-600">*</span></>}
+            value={disposalReason}
+            onChange={(e) => setDisposalReason(e.target.value)}
+            required
+          >
+            <option value="end_of_life">End of Life</option>
+            <option value="excessive_maintenance">Excessive Maintenance</option>
+            <option value="accident_damage">Accident Damage</option>
+            <option value="upgrade">Upgrade</option>
+            <option value="policy_change">Policy Change</option>
+          </Select>
+        </div>
+
+        <div>
+          <Input
+            label={<>Current Mileage (km) <span className="text-red-600">*</span></>}
+            type="number"
+            value={currentMileage}
+            onChange={(e) => setCurrentMileage(parseInt(e.target.value))}
+            required
+            min="0"
+            step="1"
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4">
+          <Button 
+            type="button" 
+            variant="secondary" 
+            onClick={() => {
+              setIsDisposalModalOpen(false);
+              setSelectedVehicle(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary">
+            Submit Disposal Request
+          </Button>
+        </div>
+      </form>
+    </Modal>
+    </>
   );
 }

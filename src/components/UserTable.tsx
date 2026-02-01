@@ -92,7 +92,7 @@ export default function UserTable({ users, onDelete, onEdit, onToggleStatus }: U
                     Active
                   </Badge>
                 ) : (
-                  <Badge variant="default">
+                  <Badge variant="danger">
                     Inactive
                   </Badge>
                 )}

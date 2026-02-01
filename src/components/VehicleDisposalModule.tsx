@@ -671,19 +671,44 @@ export default function VehicleDisposalModule() {
   const handleApproveRequest = async (id: string) => {
     try {
       const request = disposalRequests.find(r => r.id === id);
+      if (!request) {
+        notificationService.error('Error', 'Disposal request not found');
+        return;
+      }
+
       const updated = await disposalService.updateRequest(id, {
         approval_status: 'approved',
         status: 'listed',
       });
       setDisposalRequests(disposalRequests.map(r => r.id === updated.id ? updated : r));
       
+      // Update vehicle status to disposed
+      try {
+        await vehicleService.update(request.vehicle_id, { status: 'disposed' });
+        
+        // Update local vehicles state
+        setVehicles(vehicles.map(v => 
+          v.id === request.vehicle_id ? { ...v, status: 'disposed' } : v
+        ));
+        
+        // Dispatch event to update vehicles in other components
+        window.dispatchEvent(new CustomEvent('vehiclesUpdated', { 
+          detail: vehicles.map(v => 
+            v.id === request.vehicle_id ? { ...v, status: 'disposed' } : v
+          )
+        }));
+      } catch (vehicleError: any) {
+        console.error('Failed to update vehicle status:', vehicleError);
+        // Continue with success notification even if vehicle update fails
+      }
+      
       notificationService.success(
         'Request Approved',
-        `Disposal request ${request?.disposal_number} has been approved`
+        `Disposal request ${request?.disposal_number} has been approved and vehicle marked as disposed`
       );
       await auditLogService.createLog(
         'Disposal Request Approved',
-        `Approved disposal request ${request?.disposal_number}`
+        `Approved disposal request ${request?.disposal_number} and marked vehicle as disposed`
       );
     } catch (error: any) {
       console.error('Failed to approve disposal request:', error);
@@ -1041,7 +1066,7 @@ export default function VehicleDisposalModule() {
                             request.status === 'listed' ? 'success' :
                             request.status === 'bidding_open' ? 'accent' :
                             request.status === 'sold' ? 'success' :
-                            request.status === 'transferred' ? 'default' :
+                            request.status === 'transferred' ? 'success' :
                             'danger'
                           }>
                             {request.status.replace('_', ' ')}
@@ -1116,7 +1141,7 @@ export default function VehicleDisposalModule() {
                       <td className="px-4 py-3 text-sm text-text-secondary">{new Date(auction.end_date).toLocaleDateString()}</td>
                       <td className="px-4 py-3 text-sm">
                         <Badge variant={
-                          auction.auction_status === 'scheduled' ? 'default' :
+                          auction.auction_status === 'scheduled' ? 'warning' :
                           auction.auction_status === 'active' ? 'accent' :
                           auction.auction_status === 'closed' ? 'success' :
                           'danger'
