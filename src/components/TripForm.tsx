@@ -1,6 +1,13 @@
 // Trip Form Component - Defined per trip-scheduling-module.md
-import React, { useState, useEffect } from 'react';
-import { Trip, Vehicle, Driver, Maintenance } from '../types';import { Input, Select, Textarea, Button } from './ui';
+import React, { useState, useEffect, useRef } from 'react';
+import { Trip, Vehicle, Driver, Maintenance } from '../types';
+import { Input, Select, Textarea, Button } from './ui';
+
+interface AddressSuggestion {
+  display_name: string;
+  lat: string;
+  lon: string;
+}
 interface TripFormProps {
   onSave: (trip: Omit<Trip, 'id' | 'created_at' | 'updated_at'>) => void;
   onUpdate?: (trip: Trip) => void;
@@ -9,10 +16,6 @@ interface TripFormProps {
   drivers: Driver[];
   maintenances: Maintenance[];
 }
-
-// TODO: Replace with your Google Maps API key
-// Get your API key from: https://console.cloud.google.com/google/maps-apis
-const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY_HERE';
 
 export default function TripForm({ onSave, onUpdate, initialData, vehicles, drivers, maintenances }: TripFormProps) {
   const [formData, setFormData] = useState<Omit<Trip, 'id' | 'created_at' | 'updated_at'>>({
@@ -34,9 +37,146 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
   const [distanceError, setDistanceError] = useState<string | null>(null);
   const [maintenanceWarning, setMaintenanceWarning] = useState<string | null>(null);
+  const [estimatedDuration, setEstimatedDuration] = useState('');
+  const [routeInstructions, setRouteInstructions] = useState<string[]>([]);
+  const [originSuggestions, setOriginSuggestions] = useState<AddressSuggestion[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<AddressSuggestion[]>([]);
+  const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+  const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
+  const [originCoords, setOriginCoords] = useState<{lat: number, lon: number} | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{lat: number, lon: number} | null>(null);
+  const originRef = useRef<HTMLDivElement>(null);
+  const destinationRef = useRef<HTMLDivElement>(null);
 
   // Filter: only active vehicles per business rules
   const activeVehicles = vehicles.filter(v => v.status !== 'disposed');
+
+  // Search addresses using Nominatim (OpenStreetMap)
+  const searchAddress = async (query: string, isOrigin: boolean) => {
+    if (!query || query.length < 3) {
+      if (isOrigin) setOriginSuggestions([]);
+      else setDestinationSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'VehicleMaintenanceSystem/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+      
+      if (isOrigin) {
+        setOriginSuggestions(data);
+        setShowOriginSuggestions(true);
+      } else {
+        setDestinationSuggestions(data);
+        setShowDestinationSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error searching address:', error);
+    }
+  };
+
+  // Calculate route using OSRM
+  const calculateRoute = async (originLat: number, originLon: number, destLat: number, destLon: number) => {
+    setIsCalculatingDistance(true);
+    setDistanceError(null);
+
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=false&steps=true`
+      );
+      const data = await response.json();
+
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const distanceInKm = route.distance / 1000;
+        const durationInMinutes = Math.round(route.duration / 60);
+        const hours = Math.floor(durationInMinutes / 60);
+        const minutes = durationInMinutes % 60;
+        
+        // Extract major roads for route summary (filter roads > 500m)
+        const majorRoads: string[] = [];
+        if (route.legs && route.legs[0]?.steps) {
+          route.legs[0].steps.forEach((step: any) => {
+            if (step.name && step.name !== '' && step.distance > 500) {
+              // Avoid duplicates
+              if (!majorRoads.includes(step.name)) {
+                majorRoads.push(step.name);
+              }
+            }
+          });
+        }
+        
+        const routeSummary = majorRoads.length > 0 
+          ? majorRoads.slice(0, 5).join(' → ') // Show up to 5 major roads
+          : 'Direct route via local roads';
+        
+        setFormData(prev => ({
+          ...prev,
+          distance_km: parseFloat(distanceInKm.toFixed(2)),
+        }));
+        setEstimatedDuration(hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`);
+        setRouteInstructions([routeSummary]);
+        setDistanceError(null);
+      } else {
+        setDistanceError('Could not calculate route. Please check addresses.');
+        setRouteInstructions([]);
+      }
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      setDistanceError('Failed to calculate route. Please enter manually.');
+      setRouteInstructions([]);
+    } finally {
+      setIsCalculatingDistance(false);
+    }
+  };
+
+  // Debounced address search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.origin && !originCoords) {
+        searchAddress(formData.origin, true);
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.origin, originCoords]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.destination && !destinationCoords) {
+        searchAddress(formData.destination, false);
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.destination, destinationCoords]);
+
+  // Auto-calculate route when both coordinates are available
+  useEffect(() => {
+    if (originCoords && destinationCoords) {
+      calculateRoute(originCoords.lat, originCoords.lon, destinationCoords.lat, destinationCoords.lon);
+    }
+  }, [originCoords, destinationCoords]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (originRef.current && !originRef.current.contains(event.target as Node)) {
+        setShowOriginSuggestions(false);
+      }
+      if (destinationRef.current && !destinationRef.current.contains(event.target as Node)) {
+        setShowDestinationSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Check for maintenance conflicts
   useEffect(() => {
@@ -61,65 +201,6 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
     }
   }, [formData.vehicle_id, formData.planned_departure, maintenances]);
 
-  // Auto-calculate distance when origin and destination are provided
-  useEffect(() => {
-    const calculateDistance = async () => {
-      if (!formData.origin || !formData.destination) {
-        setDistanceError(null);
-        return;
-      }
-
-      // Skip if API key is not configured
-      if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
-        setDistanceError('Google Maps API key not configured');
-        return;
-      }
-
-      setIsCalculatingDistance(true);
-      setDistanceError(null);
-
-      try {
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(
-            formData.origin
-          )}&destinations=${encodeURIComponent(
-            formData.destination
-          )}&units=metric&key=${GOOGLE_MAPS_API_KEY}`,
-          {
-            mode: 'cors',
-          }
-        );
-
-        const data = await response.json();
-
-        if (data.status === 'OK' && data.rows[0]?.elements[0]?.status === 'OK') {
-          const distanceInMeters = data.rows[0].elements[0].distance.value;
-          const distanceInKm = distanceInMeters / 1000;
-
-          setFormData(prev => ({
-            ...prev,
-            distance_km: parseFloat(distanceInKm.toFixed(2)),
-          }));
-          setDistanceError(null);
-        } else {
-          setDistanceError('Could not calculate distance. Please check addresses.');
-        }
-      } catch (error) {
-        console.error('Error calculating distance:', error);
-        setDistanceError('Failed to calculate distance. Please enter manually.');
-      } finally {
-        setIsCalculatingDistance(false);
-      }
-    };
-
-    // Debounce: wait 1 second after user stops typing
-    const timeoutId = setTimeout(() => {
-      calculateDistance();
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
-  }, [formData.origin, formData.destination]);
-
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -142,10 +223,37 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    // Reset coordinates when address is manually changed
+    if (name === 'origin') {
+      setOriginCoords(null);
+      setEstimatedDuration('');
+      setRouteInstructions([]);
+    }
+    if (name === 'destination') {
+      setDestinationCoords(null);
+      setEstimatedDuration('');
+      setRouteInstructions([]);
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: name === 'distance_km' || name === 'estimated_fuel_consumption' ? parseFloat(value) : value,
     }));
+  };
+
+  const handleSelectSuggestion = (suggestion: AddressSuggestion, isOrigin: boolean) => {
+    if (isOrigin) {
+      setFormData(prev => ({ ...prev, origin: suggestion.display_name }));
+      setOriginCoords({ lat: parseFloat(suggestion.lat), lon: parseFloat(suggestion.lon) });
+      setShowOriginSuggestions(false);
+      setOriginSuggestions([]);
+    } else {
+      setFormData(prev => ({ ...prev, destination: suggestion.display_name }));
+      setDestinationCoords({ lat: parseFloat(suggestion.lat), lon: parseFloat(suggestion.lon) });
+      setShowDestinationSuggestions(false);
+      setDestinationSuggestions([]);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -219,7 +327,7 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
         </div>
 
         {/* Origin (text/autocomplete, required) */}
-        <div>
+        <div style={{ position: 'relative' }} ref={originRef}>
           <Input
             label={<>Origin <span className="text-red-600">*</span></>}
             type="text"
@@ -227,12 +335,50 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
             value={formData.origin}
             onChange={handleChange}
             required
-            placeholder="Enter origin address"
+            placeholder="Start typing address..."
+            style={{
+              backgroundColor: originCoords ? '#2d3748' : undefined,
+              color: originCoords ? '#e2e8f0' : undefined
+            }}
           />
+          {showOriginSuggestions && originSuggestions.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: '#2d3748',
+              border: '1px solid #4a5568',
+              borderRadius: '4px',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              zIndex: 1000,
+              marginTop: '4px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
+            }}>
+              {originSuggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  onClick={() => handleSelectSuggestion(suggestion, true)}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    borderBottom: index < originSuggestions.length - 1 ? '1px solid #4a5568' : 'none',
+                    transition: 'background-color 0.2s',
+                    color: '#e2e8f0'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a5568'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ fontSize: '14px' }}>{suggestion.display_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Destination (text/autocomplete, required) */}
-        <div>
+        <div style={{ position: 'relative' }} ref={destinationRef}>
           <Input
             label={<>Destination <span className="text-red-600">*</span></>}
             type="text"
@@ -240,8 +386,46 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
             value={formData.destination}
             onChange={handleChange}
             required
-            placeholder="Enter destination address"
+            placeholder="Start typing address..."
+            style={{
+              backgroundColor: destinationCoords ? '#2d3748' : undefined,
+              color: destinationCoords ? '#e2e8f0' : undefined
+            }}
           />
+          {showDestinationSuggestions && destinationSuggestions.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: '#2d3748',
+              border: '1px solid #4a5568',
+              borderRadius: '4px',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              zIndex: 1000,
+              marginTop: '4px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
+            }}>
+              {destinationSuggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  onClick={() => handleSelectSuggestion(suggestion, false)}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    borderBottom: index < destinationSuggestions.length - 1 ? '1px solid #4a5568' : 'none',
+                    transition: 'background-color 0.2s',
+                    color: '#e2e8f0'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a5568'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ fontSize: '14px' }}>{suggestion.display_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Planned Departure (datetime, required) */}
@@ -280,15 +464,47 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
             min="0"
             step="0.1"
             disabled={isCalculatingDistance}
-            helperText="Distance auto-calculates from Google Maps"
+            helperText="Distance auto-calculates from OpenStreetMap"
           />
           {isCalculatingDistance && (
-            <p className="mt-1 text-xs text-blue-600">Calculating...</p>
+            <p className="mt-1 text-xs text-blue-600">Calculating route...</p>
           )}
           {distanceError && (
             <p className="mt-1 text-xs text-amber-600">{distanceError}</p>
           )}
         </div>
+
+        {/* Estimated Duration (display only) */}
+        {estimatedDuration && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Estimated Duration
+            </label>
+            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200">
+              {estimatedDuration}
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Duration computed based on optimal driving route
+            </p>
+          </div>
+        )}
+
+        {/* Route Instructions */}
+        {routeInstructions.length > 0 && (
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Best Route Summary
+            </label>
+            <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {routeInstructions[0]}
+              </p>
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Optimal route via major roads (OpenStreetMap)
+            </p>
+          </div>
+        )}
 
         {/* Estimated Fuel Consumption (number, required, liters) */}
         <div>
