@@ -70,6 +70,9 @@ export interface Trip {
   estimated_fuel_consumption: number;
   route_waypoints?: any; // JSON
   notes?: string;
+  tracking_enabled?: boolean;
+  tracking_started_at?: string;
+  tracking_stopped_at?: string;
   created_at: string;
   updated_at: string;
 }

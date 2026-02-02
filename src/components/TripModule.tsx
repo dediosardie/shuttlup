@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Trip, Vehicle, Driver, Maintenance } from '../types';
 import TripTable from './TripTable';
 import TripForm from './TripForm';
+import DriverTripTracker from './DriverTripTracker';
 import Modal from './Modal';
 import { Card, Button } from './ui';
 import { vehicleStorage, driverStorage, maintenanceStorage } from '../storage';
@@ -273,6 +274,28 @@ export default function TripModule() {
           </div>
         </Card>
       </div>
+
+      {/* Active Trip Tracking Section */}
+      {inProgressTrips > 0 && (
+        <Card>
+          <div className="p-6 border-b border-border-muted">
+            <h3 className="text-lg font-semibold text-text-primary">Active Trip Tracking</h3>
+            <p className="text-sm text-text-secondary mt-1">Real-time GPS tracking for in-progress trips</p>
+          </div>
+          <div className="p-6 space-y-4">
+            {trips
+              .filter(t => t.status === 'in_progress')
+              .map(trip => (
+                <DriverTripTracker
+                  key={trip.id}
+                  trip={trip}
+                  onComplete={() => handleCompleteTrip(trip.id)}
+                />
+              ))
+            }
+          </div>
+        </Card>
+      )}
 
       {/* Main Content */}
       <Card>
