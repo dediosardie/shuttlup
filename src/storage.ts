@@ -93,7 +93,7 @@ export const driverStorage = {
     }
   },
 
-  async save(driver: Driver): Promise<Driver> {
+  async save(driver: Omit<Driver, 'id'>): Promise<Driver> {
     try {
       const { data, error } = await supabase
         .from('drivers')

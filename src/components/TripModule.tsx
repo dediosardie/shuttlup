@@ -10,6 +10,8 @@ import { vehicleStorage, driverStorage, maintenanceStorage } from '../storage';
 import { tripService } from '../services/supabaseService';
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
+import { authService } from '../services/authService';
+import { useRoleAccess } from '../hooks/useRoleAccess';
 
 export default function TripModule() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -19,6 +21,19 @@ export default function TripModule() {
   const [editingTrip, setEditingTrip] = useState<Trip | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const { userRole } = useRoleAccess();
+
+  // Get current user email
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { user } = await authService.getSession();
+      if (user?.email) {
+        setCurrentUserEmail(user.email);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     // Load trips, vehicles, and drivers from storage on mount
@@ -208,11 +223,19 @@ export default function TripModule() {
     setEditingTrip(undefined);
   };
 
-  // Calculate stats
-  const plannedTrips = trips.filter(t => t.status === 'planned').length;
-  const inProgressTrips = trips.filter(t => t.status === 'in_progress').length;
-  const completedTrips = trips.filter(t => t.status === 'completed').length;
-  const totalDistance = trips.reduce((sum, t) => sum + t.distance_km, 0);
+  // Filter trips for driver role - only show trips assigned to them
+  const filteredTrips = userRole?.role === 'driver' && currentUserEmail
+    ? trips.filter(trip => {
+        const driver = drivers.find(d => d.id === trip.driver_id);
+        return driver?.email === currentUserEmail;
+      })
+    : trips;
+
+  // Calculate stats based on filtered trips
+  const plannedTrips = filteredTrips.filter(t => t.status === 'planned').length;
+  const inProgressTrips = filteredTrips.filter(t => t.status === 'in_progress').length;
+  const completedTrips = filteredTrips.filter(t => t.status === 'completed').length;
+  const totalDistance = filteredTrips.reduce((sum, t) => sum + t.distance_km, 0);
 
   return (
     <div className="space-y-6">
@@ -283,7 +306,7 @@ export default function TripModule() {
             <p className="text-sm text-text-secondary mt-1">Real-time GPS tracking for in-progress trips</p>
           </div>
           <div className="p-6 space-y-4">
-            {trips
+            {filteredTrips
               .filter(t => t.status === 'in_progress')
               .map(trip => (
                 <DriverTripTracker
@@ -327,7 +350,7 @@ export default function TripModule() {
             </div>
           ) : (
             <TripTable
-              trips={trips}
+              trips={filteredTrips}
               vehicles={vehicles}
               drivers={drivers}
               onEdit={handleEditTrip}

@@ -37,12 +37,8 @@ export default function DriverModule() {
   }, [drivers]);
 
   const handleSaveDriver = async (driverData: Omit<Driver, 'id'>) => {
-    const newDriver: Driver = {
-      ...driverData,
-      id: self.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    };
     try {
-      await driverStorage.save(newDriver);
+      const newDriver = await driverStorage.save(driverData);
       setDrivers([...drivers, newDriver]);
       setIsModalOpen(false);
       

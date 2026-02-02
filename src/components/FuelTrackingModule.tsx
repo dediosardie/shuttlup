@@ -11,6 +11,8 @@ import { fuelService, vehicleService, driverService } from '../services/supabase
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
 import { openaiService } from '../services/openaiService';
+import { authService } from '../services/authService';
+import { useRoleAccess } from '../hooks/useRoleAccess';
 // Format number with thousand separators
 const formatNumber = (num: number, decimals: number = 2): string => {
   return num.toLocaleString('en-US', {
@@ -30,6 +32,8 @@ export default function FuelTrackingModule() {
   const [editingTransaction, setEditingTransaction] = useState<FuelTransaction | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const { userRole } = useRoleAccess();
   
   // AI Analysis state
   const [showEfficiencyReport, setShowEfficiencyReport] = useState(false);
@@ -37,6 +41,17 @@ export default function FuelTrackingModule() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string>('');
   const [showConfigModal, setShowConfigModal] = useState(false);
+
+  // Get current user email
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { user } = await authService.getSession();
+      if (user?.email) {
+        setCurrentUserEmail(user.email);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -234,9 +249,17 @@ export default function FuelTrackingModule() {
     setEditingTransaction(undefined);
   };
 
-  // Calculate stats
-  const totalLiters = transactions.reduce((sum, t) => sum + t.liters, 0);
-  const totalCost = transactions.reduce((sum, t) => sum + t.cost, 0);
+  // Filter transactions for driver role - only show transactions assigned to them
+  const filteredTransactions = userRole?.role === 'driver' && currentUserEmail
+    ? transactions.filter(transaction => {
+        const driver = drivers.find(d => d.id === transaction.driver_id);
+        return driver?.email === currentUserEmail;
+      })
+    : transactions;
+
+  // Calculate stats based on filtered transactions
+  const totalLiters = filteredTransactions.reduce((sum, t) => sum + t.liters, 0);
+  const totalCost = filteredTransactions.reduce((sum, t) => sum + t.cost, 0);
   const avgCostPerLiter = totalLiters > 0 ? totalCost / totalLiters : 0;
 
   return (
@@ -247,7 +270,7 @@ export default function FuelTrackingModule() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-secondary">Total Transactions</p>
-              <p className="text-2xl font-bold text-text-primary mt-1">{transactions.length}</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">{filteredTransactions.length}</p>
             </div>
             <div className="w-12 h-12 bg-accent-soft rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,7 +368,7 @@ export default function FuelTrackingModule() {
             </div>
           ) : (
             <FuelTransactionTable
-              transactions={transactions}
+              transactions={filteredTransactions}
               vehicles={vehicles}
               drivers={drivers}
               onEdit={handleEditTransaction}
