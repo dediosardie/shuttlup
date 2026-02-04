@@ -125,44 +125,48 @@ function App() {
 
   // Check and enforce role-based access for current active module
   useEffect(() => {
-    if (!authLoading && !roleLoading && !pageAccessLoading && user && userRole) {
-      // Map activeModule to paths
-      const moduleToPat: Record<ActiveModule, string> = {
-        'reporting': '/reports',
-        'vehicles': '/vehicles',
-        'drivers': '/drivers',
-        'trips': '/trips',
-        'fuel': '/fuel',
-        'incidents': '/incidents',
-        'compliance': '/compliance',
-        'disposal': '/disposal',
-        'maintenance': '/maintenance',
-        'users': '/users',
-        'page_restrictions': '/page-restrictions',
-        'live_tracking': '/live-tracking',
-        'attendance': '/attendance',
-      };
+    async function checkAccess() {
+      if (!authLoading && !roleLoading && !pageAccessLoading && user && userRole) {
+        // Map activeModule to paths
+        const moduleToPat: Record<ActiveModule, string> = {
+          'reporting': '/reports',
+          'vehicles': '/vehicles',
+          'drivers': '/drivers',
+          'trips': '/trips',
+          'fuel': '/fuel',
+          'incidents': '/incidents',
+          'compliance': '/compliance',
+          'disposal': '/disposal',
+          'maintenance': '/maintenance',
+          'users': '/users',
+          'page_restrictions': '/page-restrictions',
+          'live_tracking': '/live-tracking',
+          'attendance': '/attendance',
+        };
 
-      const currentPath = moduleToPat[activeModule];
-      const redirectPath = checkRoleAccess(userRole.role, currentPath);
+        const currentPath = moduleToPat[activeModule];
+        const redirectPath = await checkRoleAccess(userRole.role, currentPath);
 
-      if (redirectPath && redirectPath !== currentPath) {
-        // Find the module that corresponds to the redirect path
-        const redirectModule = Object.entries(moduleToPat).find(
-          ([, path]) => path === redirectPath
-        )?.[0] as ActiveModule | undefined;
+        if (redirectPath && redirectPath !== currentPath) {
+          // Find the module that corresponds to the redirect path
+          const redirectModule = Object.entries(moduleToPat).find(
+            ([, path]) => path === redirectPath
+          )?.[0] as ActiveModule | undefined;
 
-        if (redirectModule && redirectModule !== activeModule) {
-          setActiveModule(redirectModule);
-          
-          // Show notification about redirect
-          notificationService.warning(
-            'Access Denied',
-            `You don't have access to that page. Redirected to your default page.`
-          );
+          if (redirectModule && redirectModule !== activeModule) {
+            setActiveModule(redirectModule);
+            
+            // Show notification about redirect
+            notificationService.warning(
+              'Access Denied',
+              `You don't have access to that page. Redirected to your default page.`
+            );
+          }
         }
       }
     }
+
+    checkAccess();
   }, [activeModule, authLoading, roleLoading, pageAccessLoading, user, userRole]);
 
   const handleSignOut = async () => {

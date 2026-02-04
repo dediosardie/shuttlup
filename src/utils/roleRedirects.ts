@@ -6,6 +6,7 @@
  */
 
 import { UserRole } from '../config/rolePermissions';
+import { pageRestrictionService } from '../services/pageRestrictionService';
 
 /**
  * Default landing pages for each role
@@ -32,35 +33,40 @@ export function getRoleDefaultPage(role: UserRole | null | undefined): string {
 /**
  * Check if a user with a given role can access a specific path
  * Returns the redirect path if access is denied, null if access is allowed
+ * This function dynamically checks against the page_restrictions table
  */
-export function checkRoleAccess(
+export async function checkRoleAccess(
   role: UserRole | null | undefined,
   currentPath: string
-): string | null {
+): Promise<string | null> {
   if (!role) {
     return '/login';
   }
 
-  // Define which paths each role can access
-  const roleAccessMap: Record<UserRole, string[]> = {
-    driver: ['/trips', '/vehicles', '/fuel', '/incidents', '/attendance'],
-    administration: ['/reports', '/vehicles', '/drivers', '/maintenance', '/trips', '/fuel', '/incidents', '/compliance', '/disposal', '/analytics','/attendance', '/users', '/page-restrictions', '/live-tracking'],
-    maintenance_team: ['/vehicles', '/maintenance', '/incidents', '/disposal', '/reports'],
-    fleet_manager: ['/reports', '/vehicles', '/drivers', '/maintenance', '/trips', '/fuel', '/incidents', '/compliance', '/disposal', '/analytics', '/live-tracking','/attendance'],
-    client_company_liaison: ['/reports', '/vehicles', '/compliance'],
-  };
-
-  const allowedPaths = roleAccessMap[role] || [];
-  
-  // Check if current path is allowed
-  const isAllowed = allowedPaths.some(path => currentPath.startsWith(path));
-  
-  if (!isAllowed) {
-    // Redirect to role's default page
+  try {
+    // Get accessible pages from database for this role
+    const accessiblePages = await pageRestrictionService.getAccessiblePagesByRole(role);
+    const allowedPaths = accessiblePages.map(page => page.page_path);
+    
+    console.log(`🔍 [checkRoleAccess] Role: ${role}, Current path: ${currentPath}`);
+    console.log(`🔍 [checkRoleAccess] Allowed paths:`, allowedPaths);
+    
+    // Check if current path is allowed
+    const isAllowed = allowedPaths.some(path => currentPath.startsWith(path));
+    
+    if (!isAllowed) {
+      console.warn(`⚠️ [checkRoleAccess] Access denied to ${currentPath} for role ${role}`);
+      // Redirect to role's default page
+      return getRoleDefaultPage(role);
+    }
+    
+    console.log(`✓ [checkRoleAccess] Access granted to ${currentPath} for role ${role}`);
+    return null; // Access allowed
+  } catch (error) {
+    console.error('[checkRoleAccess] Error checking access:', error);
+    // On error, redirect to default page as a safety measure
     return getRoleDefaultPage(role);
   }
-  
-  return null; // Access allowed
 }
 
 /**

@@ -73,7 +73,7 @@ export default function DriverAttendancePage() {
 
       // Request camera access and capture a single frame
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
+        video: { facingMode: 'environment', width: 640, height: 480 },
       });
 
       // Create video element to capture the frame
@@ -103,16 +103,19 @@ export default function DriverAttendancePage() {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Convert to blob and file
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], `attendance_${Date.now()}.jpg`, { type: 'image/jpeg' });
-            setImageFile(file);
-            setCapturedImage(canvas.toDataURL('image/jpeg'));
-          }
-        }, 'image/jpeg', 0.8);
+        await new Promise<void>((resolve) => {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const file = new File([blob], `attendance_${Date.now()}.jpg`, { type: 'image/jpeg' });
+              setImageFile(file);
+              setCapturedImage(canvas.toDataURL('image/jpeg'));
+            }
+            resolve();
+          }, 'image/jpeg', 0.8);
+        });
       }
 
-      // Immediately stop camera stream
+      // Stop camera stream after capture is complete
       mediaStream.getTracks().forEach(track => track.stop());
       
     } catch (error: any) {
