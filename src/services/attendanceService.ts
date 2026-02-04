@@ -46,7 +46,7 @@ export const attendanceService = {
   },
 
   /**
-   * Create attendance record
+   * Create attendance record with structured image upload
    */
   async createAttendance(
     driverId: string,
@@ -57,33 +57,54 @@ export const attendanceService = {
   ): Promise<DriverAttendance> {
     let imageUrl: string | undefined;
 
-    // Upload image to Supabase Storage if provided
+    // Upload image to Supabase Storage with proper structure if provided
     if (imageFile) {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${driverId}_${Date.now()}.${fileExt}`;
-      const filePath = `attendance/${fileName}`;
+      try {
+        // Get current date components for organized folder structure
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        
+        // Create structured path: attendance/{year}/{month}/{day}/{driverId}_{timestamp}_{action}.jpg
+        // Example: attendance/2026/02/04/driver-123_1707064325847_login.jpg
+        const timestamp = now.getTime();
+        const fileExt = imageFile.type.split('/')[1] || 'jpg';
+        const fileName = `${driverId}_${timestamp}_${actionType}.${fileExt}`;
+        const filePath = `attendance/${year}/${month}/${day}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('driver-attendance')
-        .upload(filePath, imageFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+        console.log('📤 Uploading attendance image:', filePath);
 
-      if (uploadError) {
-        console.error('Image upload error:', uploadError);
-        throw new Error('Failed to upload image');
+        // Upload to Supabase Storage bucket
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('driver-attendance')
+          .upload(filePath, imageFile, {
+            cacheControl: '31536000', // Cache for 1 year
+            upsert: false,
+            contentType: imageFile.type,
+          });
+
+        if (uploadError) {
+          console.error('❌ Image upload error:', uploadError);
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+
+        console.log('✅ Image uploaded successfully:', uploadData);
+
+        // Get public URL for the uploaded image
+        const { data: urlData } = supabase.storage
+          .from('driver-attendance')
+          .getPublicUrl(filePath);
+
+        imageUrl = urlData.publicUrl;
+        console.log('🔗 Image URL:', imageUrl);
+      } catch (error) {
+        console.error('❌ Image upload failed:', error);
+        throw new Error('Failed to upload attendance image. Please try again.');
       }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('driver-attendance')
-        .getPublicUrl(filePath);
-
-      imageUrl = urlData.publicUrl;
     }
 
-    // Create attendance record
+    // Create attendance record in database
     const attendanceData = {
       driver_id: driverId,
       action_type: actionType,
@@ -94,13 +115,20 @@ export const attendanceService = {
       longitude,
     };
 
+    console.log('💾 Creating attendance record:', attendanceData);
+
     const { data, error } = await supabase
       .from('driver_attendance')
       .insert([attendanceData])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database insert error:', error);
+      throw error;
+    }
+
+    console.log('✅ Attendance record created:', data);
     return data;
   },
 
