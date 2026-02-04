@@ -43,10 +43,10 @@ export function checkRoleAccess(
 
   // Define which paths each role can access
   const roleAccessMap: Record<UserRole, string[]> = {
-    driver: ['/trips', '/vehicles', '/fuel', '/incidents'],
-    administration: ['/reports', '/vehicles', '/drivers', '/maintenance', '/trips', '/fuel', '/incidents', '/compliance', '/disposal', '/analytics', '/users', '/page-restrictions', '/live-tracking'],
+    driver: ['/trips', '/vehicles', '/fuel', '/incidents', '/attendance'],
+    administration: ['/reports', '/vehicles', '/drivers', '/maintenance', '/trips', '/fuel', '/incidents', '/compliance', '/disposal', '/analytics','/attendance', '/users', '/page-restrictions', '/live-tracking'],
     maintenance_team: ['/vehicles', '/maintenance', '/incidents', '/disposal', '/reports'],
-    fleet_manager: ['/reports', '/vehicles', '/drivers', '/maintenance', '/trips', '/fuel', '/incidents', '/compliance', '/disposal', '/analytics', '/live-tracking'],
+    fleet_manager: ['/reports', '/vehicles', '/drivers', '/maintenance', '/trips', '/fuel', '/incidents', '/compliance', '/disposal', '/analytics', '/live-tracking','/attendance'],
     client_company_liaison: ['/reports', '/vehicles', '/compliance'],
   };
 

@@ -7,6 +7,7 @@ interface FuelEfficiencyAnalysis {
   insights: string[];
   recommendations: string[];
   costTrends: string;
+  vehicleEfficiency: string[];
   efficiencyScore: number;
   anomalies: string[];
 }
@@ -53,30 +54,32 @@ class OpenAIService {
     // Prepare data summary for AI analysis
     const dataSummary = this.prepareFuelDataSummary(transactions, vehicles, drivers);
 
-    const prompt = `You are a fleet management AI analyst. Analyze the following fuel transaction data and provide insights:
+    const prompt = `You are a fleet management AI analyst. Analyze the following comprehensive fuel transaction data with historical odometer readings and provide detailed insights:
 
 ${dataSummary}
 
 Please provide a comprehensive analysis in the following JSON format:
 {
-  "summary": "Brief overview of fuel usage patterns (2-3 sentences)",
-  "insights": ["Key insight 1", "Key insight 2", "Key insight 3"],
-  "recommendations": ["Actionable recommendation 1", "Actionable recommendation 2", "Actionable recommendation 3"],
-  "costTrends": "Analysis of cost trends and patterns",
-  "Vehicle Efficiency: Fuel consumption per vehicle (L/km), Identify top and bottom performing vehicles, Detect sudden drops in fuel efficiency
-  "efficiencyScore": 75, // Score from 0-100 based on efficiency
-  "anomalies": ["Any unusual patterns or outliers detected"]
+  "summary": "Brief overview of fleet fuel usage patterns and operational status (2-3 sentences)",
+  "insights": ["Key insight 1 about efficiency trends", "Key insight 2 about cost patterns", "Key insight 3 about vehicle performance", "Key insight 4 about operational issues"],
+  "recommendations": ["Actionable recommendation 1", "Actionable recommendation 2", "Actionable recommendation 3", "Actionable recommendation 4"],
+  "costTrends": "Detailed analysis of cost trends, patterns, and potential savings opportunities",
+  "vehicleEfficiency": ["Vehicle 1 analysis with L/km and km/L metrics", "Vehicle 2 analysis", "Identify best and worst performers", "Note any vehicles with declining efficiency", "Highlight vehicles with anomalies"],
+  "efficiencyScore": 75,
+  "anomalies": ["Odometer rollbacks or inconsistencies", "Unusual fuel consumption patterns", "High-distance single trips", "Low fuel economy incidents", "Any other operational concerns"]
 }
 
 Focus on:
-1. Cost efficiency and trends
-2. Fuel consumption patterns
-3. Vehicle-specific insights
-4. Driver behavior patterns (if applicable)
-5. Potential cost savings opportunities
-6. Unusual patterns or anomalies
+1. **Cost Efficiency & Trends**: Analyze cost per liter trends, identify cost-saving opportunities
+2. **Fuel Consumption Patterns**: Compare vehicle efficiency (L/km), identify best/worst performers
+3. **Distance Analysis**: Evaluate distance traveled per transaction, operational patterns
+4. **Historical Performance**: Track efficiency trends over time, identify declining performance
+5. **Anomaly Detection**: Flag odometer issues, unusual consumption, suspicious patterns
+6. **Driver Behavior**: If applicable, analyze driver-specific fuel usage patterns
+7. **Maintenance Indicators**: Identify vehicles that may need maintenance based on declining efficiency
+8. **Operational Insights**: Provide actionable recommendations for fleet optimization
 
-Provide actionable, data-driven recommendations.`;
+Provide data-driven, actionable recommendations based on the comprehensive analysis.`;
 
     try {
       const response = await fetch(this.apiUrl, {
@@ -132,17 +135,84 @@ Provide actionable, data-driven recommendations.`;
     const totalCost = transactions.reduce((sum, t) => sum + t.cost, 0);
     const avgCostPerLiter = totalLiters > 0 ? totalCost / totalLiters : 0;
 
-    // Calculate per-vehicle statistics
+    // Calculate comprehensive per-vehicle statistics with historical analysis
     const vehicleStats = vehicles.map(vehicle => {
-      const vehicleTxns = transactions.filter(t => t.vehicle_id === vehicle.id);
-      const liters = vehicleTxns.reduce((sum, t) => sum + t.liters, 0);
-      const cost = vehicleTxns.reduce((sum, t) => sum + t.cost, 0);
+      const vehicleTxns = transactions
+        .filter(t => t.vehicle_id === vehicle.id)
+        .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime());
+      
+      const totalLiters = vehicleTxns.reduce((sum, t) => sum + t.liters, 0);
+      const totalCost = vehicleTxns.reduce((sum, t) => sum + t.cost, 0);
+      
+      // Calculate distance traveled per transaction and overall statistics
+      let totalDistance = 0;
+      let validTransactions = 0;
+      const transactionDetails: string[] = [];
+      const efficiencies: number[] = [];
+      const anomalies: string[] = [];
+      
+      for (let i = 1; i < vehicleTxns.length; i++) {
+        const prevOdometer = vehicleTxns[i - 1].odometer_reading || 0;
+        const currOdometer = vehicleTxns[i].odometer_reading || 0;
+        const distanceTraveled = currOdometer - prevOdometer;
+        
+        if (distanceTraveled > 0) {
+          totalDistance += distanceTraveled;
+          validTransactions++;
+          
+          const liters = vehicleTxns[i].liters;
+          const efficiency = liters / distanceTraveled;
+          const kmPerL = distanceTraveled / liters;
+          efficiencies.push(efficiency);
+          
+          transactionDetails.push(
+            `${new Date(vehicleTxns[i].transaction_date).toLocaleDateString()}: ${distanceTraveled.toFixed(0)}km, ${liters.toFixed(2)}L, ${efficiency.toFixed(3)} L/km, ${kmPerL.toFixed(2)} km/L`
+          );
+          
+          // Detect anomalies
+          if (distanceTraveled > 1000) {
+            anomalies.push(`High distance: ${distanceTraveled.toFixed(0)}km on ${new Date(vehicleTxns[i].transaction_date).toLocaleDateString()}`);
+          }
+          if (efficiency > 0.2) {
+            anomalies.push(`High fuel consumption: ${efficiency.toFixed(3)} L/km on ${new Date(vehicleTxns[i].transaction_date).toLocaleDateString()}`);
+          }
+          if (kmPerL < 5) {
+            anomalies.push(`Low fuel economy: ${kmPerL.toFixed(2)} km/L on ${new Date(vehicleTxns[i].transaction_date).toLocaleDateString()}`);
+          }
+        } else if (distanceTraveled < 0) {
+          anomalies.push(`Odometer rollback detected on ${new Date(vehicleTxns[i].transaction_date).toLocaleDateString()}`);
+        }
+      }
+      
+      // Calculate average and best/worst efficiency
+      const avgEfficiency = efficiencies.length > 0 
+        ? (efficiencies.reduce((sum, e) => sum + e, 0) / efficiencies.length).toFixed(3) + ' L/km'
+        : 'N/A';
+      const avgKmPerLiter = efficiencies.length > 0
+        ? (efficiencies.reduce((sum, e) => sum + (1 / e), 0) / efficiencies.length).toFixed(2) + ' km/L'
+        : 'N/A';
+      const bestEfficiency = efficiencies.length > 0
+        ? Math.min(...efficiencies).toFixed(3) + ' L/km'
+        : 'N/A';
+      const worstEfficiency = efficiencies.length > 0
+        ? Math.max(...efficiencies).toFixed(3) + ' L/km'
+        : 'N/A';
+      
       return {
         vehicle: `${vehicle.make} ${vehicle.model} (${vehicle.plate_number})`,
         transactions: vehicleTxns.length,
-        liters: liters.toFixed(2),
-        cost: cost.toFixed(2),
-        avgCostPerLiter: liters > 0 ? (cost / liters).toFixed(2) : '0'
+        validTransactions: validTransactions,
+        liters: totalLiters.toFixed(2),
+        cost: totalCost.toFixed(2),
+        avgCostPerLiter: totalLiters > 0 ? (totalCost / totalLiters).toFixed(2) : '0',
+        distance: totalDistance.toFixed(2),
+        avgDistancePerTransaction: validTransactions > 0 ? (totalDistance / validTransactions).toFixed(2) : '0',
+        avgEfficiency: avgEfficiency,
+        avgKmPerLiter: avgKmPerLiter,
+        bestEfficiency: bestEfficiency,
+        worstEfficiency: worstEfficiency,
+        transactionDetails: transactionDetails.slice(-5), // Last 5 transactions
+        anomalies: anomalies
       };
     }).filter(v => v.transactions > 0);
 
@@ -184,8 +254,32 @@ FLEET FUEL CONSUMPTION OVERVIEW:
 - Total Vehicles: ${vehicles.length}
 - Active Drivers: ${drivers.filter(d => d.status === 'active').length}
 
-VEHICLE-SPECIFIC STATISTICS:
-${vehicleStats.map(v => `- ${v.vehicle}: ${v.transactions} transactions, ${v.liters}L, Php ${v.cost} total, Php ${v.avgCostPerLiter}/L avg`).join('\n')}
+VEHICLE-SPECIFIC COMPREHENSIVE ANALYSIS:
+${vehicleStats.map(v => `
+═══════════════════════════════════════════════════════════════
+VEHICLE: ${v.vehicle}
+───────────────────────────────────────────────────────────────
+TRANSACTION SUMMARY:
+  * Total Transactions: ${v.transactions}
+  * Valid Distance Calculations: ${v.validTransactions}
+  * Total Fuel Consumed: ${v.liters}L
+  * Total Cost: Php ${v.cost}
+  * Avg Cost per Liter: Php ${v.avgCostPerLiter}
+  
+DISTANCE & EFFICIENCY METRICS:
+  * Total Distance Traveled: ${v.distance} km
+  * Avg Distance per Transaction: ${v.avgDistancePerTransaction} km
+  * Average Fuel Consumption: ${v.avgEfficiency}
+  * Average Fuel Economy: ${v.avgKmPerLiter}
+  * Best Performance: ${v.bestEfficiency}
+  * Worst Performance: ${v.worstEfficiency}
+  
+RECENT TRANSACTION HISTORY (Last 5):
+${v.transactionDetails.length > 0 ? v.transactionDetails.map(td => `  - ${td}`).join('\n') : '  No valid transaction history'}
+
+DETECTED ANOMALIES:
+${v.anomalies.length > 0 ? v.anomalies.map(a => `  ⚠ ${a}`).join('\n') : '  ✓ No anomalies detected'}
+`).join('\n')}
 
 DRIVER-SPECIFIC STATISTICS:
 ${driverStats.length > 0 ? driverStats.map(d => `- ${d.driver}: ${d.transactions} transactions, ${d.liters}L, Php ${d.cost}`).join('\n') : 'No driver data available'}

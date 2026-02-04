@@ -43,6 +43,20 @@ export interface Driver {
   updated_at?: string;
 }
 
+// Driver Attendance - For tracking login/logout with image and location
+export interface DriverAttendance {
+  id: string;
+  driver_id: string;
+  attendance_date: string;
+  action_type: 'login' | 'logout';
+  timestamp: string;
+  image_url?: string;
+  latitude?: number;
+  longitude?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Maintenance Module - Simplified per maintenance-module.md
 export interface Maintenance {
   id: string;

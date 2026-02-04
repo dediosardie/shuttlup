@@ -13,6 +13,7 @@ import ReportingAnalyticsDashboard from './components/ReportingAnalyticsDashboar
 import UserModule from './components/UserModule';
 import PageRestrictionModule from './components/PageRestrictionModule';
 import LiveDriverTrackingMap from './components/LiveDriverTrackingMap';
+import DriverAttendancePage from './components/DriverAttendancePage';
 import LoginPage from './components/LoginPage';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import { ProtectedRoute, RoleBadge } from './components/ProtectedRoute';
@@ -22,7 +23,7 @@ import { authService } from './services/authService';
 import { Module } from './config/rolePermissions';
 import { getRoleDefaultPage, checkRoleAccess } from './utils/roleRedirects';
 
-type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users' | 'page_restrictions' | 'live_tracking';
+type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users' | 'page_restrictions' | 'live_tracking' | 'attendance';
 
 function App() {
   const [user, setUser] = useState<any | null>(null);
@@ -139,6 +140,7 @@ function App() {
         'users': '/users',
         'page_restrictions': '/page-restrictions',
         'live_tracking': '/live-tracking',
+        'attendance': '/attendance',
       };
 
       const currentPath = moduleToPat[activeModule];
@@ -278,7 +280,6 @@ function App() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     )},
-
     { id: 'users' as ActiveModule, module: 'users' as Module, path: '/users', label: 'Users', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -313,6 +314,11 @@ function App() {
     { id: 'disposal' as ActiveModule, module: 'disposal' as Module, path: '/disposal', label: 'Disposal', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      </svg>
+    )},
+    { id: 'attendance' as ActiveModule, module: 'drivers' as Module, path: '/attendance', label: 'Attendance', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
       </svg>
     )},
   ];
@@ -367,12 +373,13 @@ function App() {
               {activeModule === 'reporting' && 'Reporting & Analytics'}
               {activeModule === 'users' && 'User Management'}
               {activeModule === 'page_restrictions' && 'Page Restrictions'}
+              {activeModule === 'attendance' && 'Driver Attendance'}
               <span className="hidden">{vehicles.length}</span>
             </h1>
           </div>
 
           {/* Center: Search */}
-{/*           <div className="hidden md:flex flex-1 max-w-md mx-4">
+           <div className="hidden md:flex flex-1 max-w-md mx-4">
             <div className="relative w-full">
               <input
                 type="search"
@@ -383,7 +390,7 @@ function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-          </div> */}
+          </div> 
 
           {/* Right: Notifications + Profile */}
           <div className="flex items-center gap-2">
@@ -618,7 +625,7 @@ function App() {
               )}
               <div className="space-y-1">
                 {accessibleNavItems
-                  .filter(item => ['reporting', 'vehicles', 'drivers', 'trips', 'maintenance', 'fuel', 'incidents', 'compliance', 'disposal'].includes(item.id))
+                  .filter(item => ['reporting', 'vehicles', 'drivers', 'trips', 'live_tracking', 'attendance', 'maintenance', 'fuel', 'incidents', 'compliance', 'disposal'].includes(item.id))
                   .map((item) => (
                     <button
                       key={item.id}
@@ -764,6 +771,11 @@ function App() {
             {activeModule === 'live_tracking' && (
               <ProtectedRoute pagePath="/live-tracking">
                 <LiveDriverTrackingMap />
+              </ProtectedRoute>
+            )}
+            {activeModule === 'attendance' && (
+              <ProtectedRoute pagePath="/attendance">
+                <DriverAttendancePage />
               </ProtectedRoute>
             )}
           </div>
