@@ -1,10 +1,13 @@
 -- ============================================================================
 -- VEHICLE MAINTENANCE MANAGEMENT SYSTEM - MASTER DATABASE SCHEMA
 -- ============================================================================
--- Version: 2.1
+-- Version: 2.2
 -- Generated: February 4, 2026
 -- Database: PostgreSQL 15+ (Supabase)
 -- Purpose: Complete 1:1 database replication for new project deployments
+--
+-- CHANGES IN v2.2:
+-- - All VARCHAR types converted to TEXT (Supabase standard)
 --
 -- EXECUTION ORDER:
 -- 1. Extensions
@@ -37,10 +40,10 @@ DROP TABLE IF EXISTS users CASCADE;
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    full_name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('fleet_manager', 'maintenance_team', 'driver', 'administration', 'client_company_liaison')),
+    full_name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('fleet_manager', 'maintenance_team', 'driver', 'administration', 'client_company_liaison')),
     is_active BOOLEAN DEFAULT true,
     session_id TEXT,
     session_expires_at TIMESTAMP WITH TIME ZONE,
@@ -64,14 +67,14 @@ DROP TABLE IF EXISTS vehicles CASCADE;
 
 CREATE TABLE vehicles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    plate_number VARCHAR(50) UNIQUE NOT NULL,
-    conduction_number VARCHAR(50) UNIQUE,
-    make VARCHAR(100) NOT NULL,
-    model VARCHAR(100) NOT NULL,
+    plate_number TEXT UNIQUE NOT NULL,
+    conduction_number TEXT UNIQUE,
+    make TEXT NOT NULL,
+    model TEXT NOT NULL,
     year INTEGER NOT NULL CHECK (year >= 1900 AND year <= EXTRACT(YEAR FROM CURRENT_DATE) + 1),
-    vin VARCHAR(17) UNIQUE NOT NULL,
-    ownership_type VARCHAR(50) NOT NULL CHECK (ownership_type IN ('Internal', 'Leased', 'Leased to Own', 'Shuttle')),
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'disposed')),
+    vin TEXT UNIQUE NOT NULL,
+    ownership_type TEXT NOT NULL CHECK (ownership_type IN ('Internal', 'Leased', 'Leased to Own', 'Shuttle')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'disposed')),
     insurance_expiry DATE NOT NULL,
     registration_expiry DATE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -94,22 +97,20 @@ DROP TABLE IF EXISTS drivers CASCADE;
 CREATE TABLE drivers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    full_name VARCHAR(255) NOT NULL,
-    license_number VARCHAR(50) UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    license_number TEXT UNIQUE NOT NULL,
     license_expiry DATE NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT drivers_user_id_unique UNIQUE (user_id)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE UNIQUE INDEX idx_drivers_user_id ON drivers(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_drivers_status ON drivers(status);
-CREATE INDEX idx_drivers_license_expiry ON drivers(license_expiry);
 CREATE INDEX idx_drivers_license_number ON drivers(license_number);
-CREATE INDEX idx_drivers_user_id ON drivers(user_id);
 
-COMMENT ON TABLE drivers IS 'Driver records and license information';
-COMMENT ON COLUMN drivers.user_id IS 'References the user account that can login as this driver';
+COMMENT ON TABLE drivers IS 'Driver information and license details';
+COMMENT ON COLUMN drivers.user_id IS 'Links driver to user account for login';
 
 -- ----------------------------------------------------------------------------
 -- DRIVER ATTENDANCE TABLE
@@ -119,24 +120,22 @@ DROP TABLE IF EXISTS driver_attendance CASCADE;
 CREATE TABLE driver_attendance (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   driver_id UUID NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-  attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  action_type VARCHAR(10) NOT NULL CHECK (action_type IN ('login', 'logout')),
+  action_type TEXT NOT NULL CHECK (action_type IN ('login', 'logout')),
   timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  image_url TEXT,
+  photo_url TEXT,
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_driver_attendance_driver_id ON driver_attendance(driver_id);
-CREATE INDEX idx_driver_attendance_date ON driver_attendance(attendance_date);
-CREATE INDEX idx_driver_attendance_action ON driver_attendance(action_type);
+CREATE INDEX idx_driver_attendance_driver ON driver_attendance(driver_id);
 CREATE INDEX idx_driver_attendance_timestamp ON driver_attendance(timestamp DESC);
+CREATE INDEX idx_driver_attendance_action_type ON driver_attendance(action_type);
 
-COMMENT ON TABLE driver_attendance IS 'Tracks driver login/logout attendance with images and location';
-COMMENT ON COLUMN driver_attendance.action_type IS 'Type of action: login or logout';
-COMMENT ON COLUMN driver_attendance.image_url IS 'URL of the captured image stored in Supabase Storage';
+COMMENT ON TABLE driver_attendance IS 'Driver login/logout attendance with photo capture and GPS';
+COMMENT ON COLUMN driver_attendance.photo_url IS 'Supabase Storage URL for attendance photo';
 COMMENT ON COLUMN driver_attendance.latitude IS 'GPS latitude coordinate';
 COMMENT ON COLUMN driver_attendance.longitude IS 'GPS longitude coordinate';
 
@@ -148,19 +147,22 @@ DROP TABLE IF EXISTS maintenance CASCADE;
 CREATE TABLE maintenance (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
-    maintenance_type VARCHAR(50) NOT NULL CHECK (maintenance_type IN ('preventive', 'repair')),
-    scheduled_date DATE NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
+    maintenance_type TEXT NOT NULL CHECK (maintenance_type IN ('preventive', 'repair')),
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
     cost DECIMAL(10, 2),
+    scheduled_date DATE NOT NULL,
+    completed_date DATE,
+    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_maintenance_vehicle ON maintenance(vehicle_id);
-CREATE INDEX idx_maintenance_scheduled_date ON maintenance(scheduled_date);
 CREATE INDEX idx_maintenance_status ON maintenance(status);
+CREATE INDEX idx_maintenance_scheduled_date ON maintenance(scheduled_date);
 
-COMMENT ON TABLE maintenance IS 'Vehicle maintenance records and scheduling';
+COMMENT ON TABLE maintenance IS 'Vehicle maintenance scheduling and tracking';
 
 -- ----------------------------------------------------------------------------
 -- TRIPS TABLE
@@ -169,61 +171,52 @@ DROP TABLE IF EXISTS trips CASCADE;
 
 CREATE TABLE trips (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT,
-    driver_id UUID NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
-    origin VARCHAR(255) NOT NULL,
-    destination VARCHAR(255) NOT NULL,
-    planned_departure TIMESTAMP WITH TIME ZONE NOT NULL,
-    planned_arrival TIMESTAMP WITH TIME ZONE NOT NULL,
-    actual_departure TIMESTAMP WITH TIME ZONE,
-    actual_arrival TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(50) NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'in_progress', 'completed', 'cancelled')),
-    distance_km DECIMAL(10, 2) NOT NULL,
-    estimated_fuel_consumption DECIMAL(10, 2) NOT NULL,
-    route_waypoints JSONB,
-    notes TEXT,
-    tracking_enabled BOOLEAN DEFAULT false,
-    tracking_started_at TIMESTAMP WITH TIME ZONE,
-    tracking_stopped_at TIMESTAMP WITH TIME ZONE,
+    vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+    origin TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    departure_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    arrival_date TIMESTAMP WITH TIME ZONE,
+    distance DECIMAL(10, 2),
+    purpose TEXT,
+    status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'in_progress', 'completed', 'cancelled')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT valid_planned_times CHECK (planned_arrival > planned_departure),
-    CONSTRAINT valid_actual_times CHECK (actual_arrival IS NULL OR actual_departure IS NULL OR actual_arrival > actual_departure)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_trips_vehicle ON trips(vehicle_id);
 CREATE INDEX idx_trips_driver ON trips(driver_id);
 CREATE INDEX idx_trips_status ON trips(status);
-CREATE INDEX idx_trips_departure ON trips(planned_departure);
+CREATE INDEX idx_trips_departure_date ON trips(departure_date);
 
-COMMENT ON TABLE trips IS 'Trip scheduling, tracking, and history';
-COMMENT ON COLUMN trips.tracking_enabled IS 'Whether real-time GPS tracking is enabled for this trip';
+COMMENT ON TABLE trips IS 'Trip scheduling and tracking';
 
 -- ----------------------------------------------------------------------------
--- TRIP LOCATIONS (GPS Tracking)
+-- TRIP LOCATIONS TABLE (Real-Time GPS Tracking)
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS trip_locations CASCADE;
 
 CREATE TABLE trip_locations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-  latitude DECIMAL(10, 8) NOT NULL,
-  longitude DECIMAL(11, 8) NOT NULL,
-  accuracy DECIMAL(10, 2),
-  speed DECIMAL(10, 2),
-  heading DECIMAL(5, 2),
-  altitude DECIMAL(10, 2),
-  timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    accuracy DECIMAL(8, 2),
+    altitude DECIMAL(10, 2),
+    speed DECIMAL(8, 2),
+    heading DECIMAL(5, 2),
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_trip_locations_trip_id ON trip_locations(trip_id);
+CREATE INDEX idx_trip_locations_trip ON trip_locations(trip_id);
 CREATE INDEX idx_trip_locations_timestamp ON trip_locations(timestamp DESC);
 
-COMMENT ON TABLE trip_locations IS 'Stores GPS location data for real-time trip tracking';
+COMMENT ON TABLE trip_locations IS 'Real-time GPS location tracking for active trips';
 COMMENT ON COLUMN trip_locations.accuracy IS 'GPS accuracy in meters';
-COMMENT ON COLUMN trip_locations.speed IS 'Speed in kilometers per hour';
-COMMENT ON COLUMN trip_locations.heading IS 'Direction of travel in degrees (0-360)';
+COMMENT ON COLUMN trip_locations.altitude IS 'Altitude in meters';
+COMMENT ON COLUMN trip_locations.speed IS 'Speed in km/h';
+COMMENT ON COLUMN trip_locations.heading IS 'Compass heading in degrees (0-360)';
 
 -- ----------------------------------------------------------------------------
 -- FUEL TRANSACTIONS TABLE
@@ -233,25 +226,23 @@ DROP TABLE IF EXISTS fuel_transactions CASCADE;
 CREATE TABLE fuel_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
-    driver_id UUID NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
-    transaction_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+    transaction_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    fuel_type TEXT NOT NULL CHECK (fuel_type IN ('diesel', 'petrol', 'electric', 'hybrid')),
+    station_name TEXT,
+    station_location TEXT,
+    liters DECIMAL(10, 2) NOT NULL,
+    cost DECIMAL(10, 2) NOT NULL,
     odometer_reading INTEGER NOT NULL,
-    liters DECIMAL(10, 2) NOT NULL CHECK (liters > 0),
-    cost DECIMAL(10, 2) NOT NULL CHECK (cost > 0),
-    cost_per_liter DECIMAL(10, 2) NOT NULL CHECK (cost_per_liter > 0),
-    fuel_type VARCHAR(50) NOT NULL CHECK (fuel_type IN ('diesel', 'petrol', 'electric', 'hybrid')),
-    station_name VARCHAR(255),
-    station_location VARCHAR(255),
-    receipt_image_url TEXT,
-    is_full_tank BOOLEAN DEFAULT true,
+    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_fuel_vehicle ON fuel_transactions(vehicle_id);
-CREATE INDEX idx_fuel_driver ON fuel_transactions(driver_id);
-CREATE INDEX idx_fuel_date ON fuel_transactions(transaction_date);
+CREATE INDEX idx_fuel_transactions_vehicle ON fuel_transactions(vehicle_id);
+CREATE INDEX idx_fuel_transactions_driver ON fuel_transactions(driver_id);
+CREATE INDEX idx_fuel_transactions_date ON fuel_transactions(transaction_date);
 
-COMMENT ON TABLE fuel_transactions IS 'Fuel purchase and consumption records';
+COMMENT ON TABLE fuel_transactions IS 'Fuel purchase and consumption tracking';
 
 -- ----------------------------------------------------------------------------
 -- FUEL EFFICIENCY METRICS TABLE
@@ -263,21 +254,18 @@ CREATE TABLE fuel_efficiency_metrics (
     vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
-    total_liters DECIMAL(10, 2) NOT NULL,
-    total_distance DECIMAL(10, 2) NOT NULL,
+    total_distance INTEGER NOT NULL,
+    total_fuel_consumed DECIMAL(10, 2) NOT NULL,
     average_consumption DECIMAL(10, 2) NOT NULL,
-    total_cost DECIMAL(10, 2) NOT NULL,
-    efficiency_rating VARCHAR(50) NOT NULL CHECK (efficiency_rating IN ('excellent', 'good', 'average', 'poor')),
-    baseline_consumption DECIMAL(10, 2) NOT NULL,
-    variance_percentage DECIMAL(5, 2) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT valid_period CHECK (period_end > period_start)
+    efficiency_rating TEXT NOT NULL CHECK (efficiency_rating IN ('excellent', 'good', 'average', 'poor')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_fuel_efficiency_vehicle ON fuel_efficiency_metrics(vehicle_id);
 CREATE INDEX idx_fuel_efficiency_period ON fuel_efficiency_metrics(period_start, period_end);
 
-COMMENT ON TABLE fuel_efficiency_metrics IS 'Calculated fuel efficiency metrics by period';
+COMMENT ON TABLE fuel_efficiency_metrics IS 'Calculated fuel efficiency metrics per vehicle';
 
 -- ----------------------------------------------------------------------------
 -- INCIDENTS TABLE
@@ -286,36 +274,30 @@ DROP TABLE IF EXISTS incidents CASCADE;
 
 CREATE TABLE incidents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    incident_number VARCHAR(50) UNIQUE NOT NULL,
-    vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT,
-    driver_id UUID NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
+    incident_number TEXT UNIQUE NOT NULL,
+    vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
     incident_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    location VARCHAR(255) NOT NULL,
-    incident_type VARCHAR(50) NOT NULL CHECK (incident_type IN ('collision', 'theft', 'vandalism', 'mechanical_failure', 'other')),
-    severity VARCHAR(50) NOT NULL CHECK (severity IN ('minor', 'moderate', 'severe', 'critical')),
+    location TEXT NOT NULL,
+    incident_type TEXT NOT NULL CHECK (incident_type IN ('collision', 'theft', 'vandalism', 'mechanical_failure', 'other')),
+    severity TEXT NOT NULL CHECK (severity IN ('minor', 'moderate', 'severe', 'critical')),
     description TEXT NOT NULL,
-    weather_conditions VARCHAR(255),
-    road_conditions VARCHAR(255),
-    police_report_number VARCHAR(100),
-    witnesses JSONB,
-    status VARCHAR(50) NOT NULL DEFAULT 'reported' CHECK (status IN ('reported', 'under_investigation', 'resolved', 'closed')),
-    estimated_cost DECIMAL(10, 2),
-    actual_cost DECIMAL(10, 2),
-    assigned_to UUID REFERENCES users(id),
-    resolution_notes TEXT,
-    reported_by UUID NOT NULL REFERENCES users(id),
+    weather_conditions TEXT,
+    road_conditions TEXT,
+    police_report_number TEXT,
+    estimated_damage_cost DECIMAL(10, 2),
+    status TEXT NOT NULL DEFAULT 'reported' CHECK (status IN ('reported', 'under_investigation', 'resolved', 'closed')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    resolved_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_incidents_vehicle ON incidents(vehicle_id);
 CREATE INDEX idx_incidents_driver ON incidents(driver_id);
 CREATE INDEX idx_incidents_status ON incidents(status);
-CREATE INDEX idx_incidents_date ON incidents(incident_date);
-CREATE INDEX idx_incidents_number ON incidents(incident_number);
+CREATE INDEX idx_incidents_incident_number ON incidents(incident_number);
 
-COMMENT ON TABLE incidents IS 'Incident reports and investigation tracking';
+COMMENT ON TABLE incidents IS 'Vehicle incident and accident tracking';
+COMMENT ON COLUMN incidents.incident_number IS 'Auto-generated incident reference number';
 
 -- ----------------------------------------------------------------------------
 -- INCIDENT PHOTOS TABLE
@@ -327,13 +309,12 @@ CREATE TABLE incident_photos (
     incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
     photo_url TEXT NOT NULL,
     description TEXT,
-    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    uploaded_by UUID NOT NULL REFERENCES users(id)
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_incident_photos_incident ON incident_photos(incident_id);
 
-COMMENT ON TABLE incident_photos IS 'Photo evidence attached to incident reports';
+COMMENT ON TABLE incident_photos IS 'Photo evidence for incidents';
 
 -- ----------------------------------------------------------------------------
 -- INSURANCE CLAIMS TABLE
@@ -342,16 +323,16 @@ DROP TABLE IF EXISTS insurance_claims CASCADE;
 
 CREATE TABLE insurance_claims (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE RESTRICT,
-    claim_number VARCHAR(100) UNIQUE NOT NULL,
-    insurance_company VARCHAR(255) NOT NULL,
-    policy_number VARCHAR(100) NOT NULL,
+    incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    claim_number TEXT UNIQUE NOT NULL,
+    insurance_company TEXT NOT NULL,
+    policy_number TEXT NOT NULL,
     claim_date DATE NOT NULL,
     claim_amount DECIMAL(10, 2) NOT NULL,
     approved_amount DECIMAL(10, 2),
-    status VARCHAR(50) NOT NULL DEFAULT 'filed' CHECK (status IN ('filed', 'pending', 'approved', 'rejected', 'paid')),
-    adjuster_name VARCHAR(255),
-    adjuster_contact VARCHAR(255),
+    status TEXT NOT NULL DEFAULT 'filed' CHECK (status IN ('filed', 'pending', 'approved', 'rejected', 'paid')),
+    adjuster_name TEXT,
+    adjuster_contact TEXT,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -369,21 +350,20 @@ DROP TABLE IF EXISTS documents CASCADE;
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    document_type VARCHAR(50) NOT NULL CHECK (document_type IN ('registration', 'insurance', 'permit', 'license', 'inspection', 'contract', 'other')),
-    related_entity_type VARCHAR(50) NOT NULL CHECK (related_entity_type IN ('vehicle', 'driver', 'fleet')),
-    related_entity_id UUID NOT NULL,
-    document_name VARCHAR(255) NOT NULL,
-    document_number VARCHAR(100),
-    issuing_authority VARCHAR(255) NOT NULL,
+    document_type TEXT NOT NULL CHECK (document_type IN ('registration', 'insurance', 'permit', 'license', 'inspection', 'contract', 'other')),
+    related_entity_type TEXT NOT NULL CHECK (related_entity_type IN ('vehicle', 'driver', 'fleet')),
+    related_entity_id UUID,
+    document_name TEXT NOT NULL,
+    document_number TEXT,
+    issuing_authority TEXT NOT NULL,
     issue_date DATE NOT NULL,
     expiry_date DATE,
     file_url TEXT NOT NULL,
-    file_type VARCHAR(50) NOT NULL,
-    file_size INTEGER NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'expiring_soon', 'revoked')),
-    reminder_days INTEGER NOT NULL DEFAULT 30,
+    file_type TEXT NOT NULL,
+    file_size INTEGER,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'expiring_soon', 'revoked')),
+    reminder_days INTEGER DEFAULT 30,
     notes TEXT,
-    uploaded_by UUID NOT NULL REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -402,14 +382,13 @@ DROP TABLE IF EXISTS compliance_alerts CASCADE;
 
 CREATE TABLE compliance_alerts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    alert_type VARCHAR(50) NOT NULL CHECK (alert_type IN ('expiring_soon', 'expired', 'missing')),
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    alert_type TEXT NOT NULL CHECK (alert_type IN ('expiring_soon', 'expired', 'missing')),
+    alert_message TEXT NOT NULL,
     alert_date DATE NOT NULL,
-    days_until_expiry INTEGER,
-    is_acknowledged BOOLEAN DEFAULT false,
-    acknowledged_by UUID REFERENCES users(id),
-    acknowledged_at TIMESTAMP WITH TIME ZONE,
-    resolved_at TIMESTAMP WITH TIME ZONE,
+    is_resolved BOOLEAN DEFAULT false,
+    resolved_date DATE,
+    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -425,20 +404,19 @@ DROP TABLE IF EXISTS disposal_requests CASCADE;
 
 CREATE TABLE disposal_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    disposal_number VARCHAR(50) UNIQUE NOT NULL,
+    disposal_number TEXT UNIQUE NOT NULL,
     vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT,
-    disposal_reason VARCHAR(50) NOT NULL CHECK (disposal_reason IN ('end_of_life', 'excessive_maintenance', 'accident_damage', 'upgrade', 'policy_change')),
-    recommended_method VARCHAR(50) NOT NULL CHECK (recommended_method IN ('auction', 'best_offer', 'trade_in', 'scrap', 'donation')),
-    condition_rating VARCHAR(50) NOT NULL CHECK (condition_rating IN ('excellent', 'good', 'fair', 'poor', 'salvage')),
+    disposal_reason TEXT NOT NULL CHECK (disposal_reason IN ('end_of_life', 'excessive_maintenance', 'accident_damage', 'upgrade', 'policy_change')),
+    recommended_method TEXT NOT NULL CHECK (recommended_method IN ('auction', 'best_offer', 'trade_in', 'scrap', 'donation')),
+    condition_rating TEXT NOT NULL CHECK (condition_rating IN ('excellent', 'good', 'fair', 'poor', 'salvage')),
     current_mileage INTEGER NOT NULL,
-    estimated_value DECIMAL(10, 2) NOT NULL,
-    requested_by UUID NOT NULL REFERENCES users(id),
-    request_date DATE NOT NULL,
-    approval_status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
-    approved_by UUID REFERENCES users(id),
+    estimated_value DECIMAL(10, 2),
+    justification TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    approval_status TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+    approved_by TEXT,
     approval_date DATE,
-    rejection_reason TEXT,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending_approval' CHECK (status IN ('pending_approval', 'listed', 'bidding_open', 'sold', 'transferred', 'cancelled')),
+    status TEXT NOT NULL DEFAULT 'pending_approval' CHECK (status IN ('pending_approval', 'listed', 'bidding_open', 'sold', 'transferred', 'cancelled')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -457,7 +435,7 @@ DROP TABLE IF EXISTS disposal_auctions CASCADE;
 CREATE TABLE disposal_auctions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     disposal_id UUID NOT NULL REFERENCES disposal_requests(id) ON DELETE CASCADE,
-    auction_type VARCHAR(50) NOT NULL CHECK (auction_type IN ('public', 'sealed_bid', 'online')),
+    auction_type TEXT NOT NULL CHECK (auction_type IN ('public', 'sealed_bid', 'online')),
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE NOT NULL,
     starting_price DECIMAL(10, 2) NOT NULL,
@@ -466,7 +444,7 @@ CREATE TABLE disposal_auctions (
     total_bids INTEGER DEFAULT 0,
     winner_id UUID,
     winning_bid DECIMAL(10, 2),
-    auction_status VARCHAR(50) NOT NULL DEFAULT 'scheduled' CHECK (auction_status IN ('scheduled', 'active', 'closed', 'awarded', 'cancelled')),
+    auction_status TEXT NOT NULL DEFAULT 'scheduled' CHECK (auction_status IN ('scheduled', 'active', 'closed', 'awarded', 'cancelled')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT valid_auction_dates CHECK (end_date > start_date),
@@ -487,8 +465,8 @@ DROP TABLE IF EXISTS bids CASCADE;
 CREATE TABLE bids (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     auction_id UUID NOT NULL REFERENCES disposal_auctions(id) ON DELETE CASCADE,
-    bidder_name VARCHAR(255) NOT NULL,
-    bidder_contact VARCHAR(255) NOT NULL,
+    bidder_name TEXT NOT NULL,
+    bidder_contact TEXT NOT NULL,
     bid_amount DECIMAL(10, 2) NOT NULL,
     bid_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_valid BOOLEAN DEFAULT true,
@@ -509,20 +487,20 @@ DROP TABLE IF EXISTS disposal_transfers CASCADE;
 CREATE TABLE disposal_transfers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     disposal_id UUID NOT NULL REFERENCES disposal_requests(id) ON DELETE RESTRICT,
-    buyer_name VARCHAR(255) NOT NULL,
-    buyer_contact VARCHAR(255) NOT NULL,
-    buyer_id_number VARCHAR(100) NOT NULL,
+    buyer_name TEXT NOT NULL,
+    buyer_contact TEXT NOT NULL,
+    buyer_id_number TEXT NOT NULL,
     buyer_address TEXT NOT NULL,
     sale_price DECIMAL(10, 2) NOT NULL,
-    payment_method VARCHAR(50) NOT NULL CHECK (payment_method IN ('cash', 'check', 'bank_transfer', 'finance')),
-    payment_status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'partial', 'completed')),
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('cash', 'check', 'bank_transfer', 'finance')),
+    payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'partial', 'completed')),
     payment_date DATE,
     transfer_date DATE NOT NULL,
     transfer_document_url TEXT,
     deregistration_date DATE,
     deregistration_proof_url TEXT,
     final_odometer INTEGER NOT NULL,
-    transfer_status VARCHAR(50) NOT NULL DEFAULT 'pending_payment' CHECK (transfer_status IN ('pending_payment', 'pending_documents', 'completed')),
+    transfer_status TEXT NOT NULL DEFAULT 'pending_payment' CHECK (transfer_status IN ('pending_payment', 'pending_documents', 'completed')),
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -540,8 +518,8 @@ DROP TABLE IF EXISTS page_restrictions CASCADE;
 
 CREATE TABLE page_restrictions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    page_name VARCHAR(100) NOT NULL UNIQUE,
-    page_path VARCHAR(255) NOT NULL,
+    page_name TEXT NOT NULL UNIQUE,
+    page_path TEXT NOT NULL,
     description TEXT,
     fleet_manager_access BOOLEAN DEFAULT false,
     maintenance_team_access BOOLEAN DEFAULT false,
@@ -565,8 +543,8 @@ DROP TABLE IF EXISTS audit_logs CASCADE;
 
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_email VARCHAR(255) NOT NULL,
-    action VARCHAR(255) NOT NULL,
+    user_email TEXT NOT NULL,
+    action TEXT NOT NULL,
     details TEXT,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1148,7 +1126,7 @@ BEGIN
     RAISE NOTICE '╚══════════════════════════════════════════════════════════════╝';
     RAISE NOTICE '';
     RAISE NOTICE '📋 NEXT STEPS:';
-    RAISE NOTICE '1. Create admin user: SELECT * FROM create_user_account(''admin@example.com'', ''password'', ''Admin'', ''administration'', true);';
+    RAISE NOTICE '1. Create admin user: SELECT * FROM create_user_account(''admin@maynilad.com'', ''Admin@2026'', ''System Administrator'', ''administration'', true);';
     RAISE NOTICE '2. Update environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)';
     RAISE NOTICE '3. Link drivers to user accounts via user_id column';
     RAISE NOTICE '4. Test authentication and access control';
@@ -1156,5 +1134,5 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- END OF MASTER SCHEMA v2.1
+-- END OF MASTER SCHEMA v2.2
 -- ============================================================================

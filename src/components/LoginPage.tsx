@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { authService } from '../services/authService';
-import logo from '../assets/logo-dark.svg';
+import logo from '../assets/logo-dns.svg';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
@@ -128,7 +128,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <img src={logo} alt="SGS-MMS Logo" className="w-64 h-32 drop-shadow-lg" />
+            <img src={logo} alt="DNS - Delta Neosolutions" className="w-auto h-24 drop-shadow-lg" />
           </div>
           <h1 className="text-3xl font-bold text-text-primary">VMMS</h1>
           <p className="text-text-secondary mt-2">Vehicle Maintenance and Management System</p>
