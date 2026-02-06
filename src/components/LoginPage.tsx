@@ -142,10 +142,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <img src={logo} alt="Shutt'L Up" className="w-auto h-48 drop-shadow-lg" />
+            <img src={logo} alt="Shutt'L Up" className="w-auto h-52 drop-shadow-lg" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary">Shutt'L Up</h1>
-          <p className="text-text-secondary mt-2">Vehicle Maintenance and Management System</p>
+          <h1 className="text-3xl font-bold text-text-primary">Safety, Comfort and On-Time</h1>
+          {/* <p className="text-text-secondary mt-2">Safety, Comfort and On-Time</p> */}
         </div>
 
         {/* Login Card */}
