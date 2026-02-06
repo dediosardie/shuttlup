@@ -16,7 +16,7 @@ const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
 
 // Allowed email domains and specific emails
 const ALLOWED_EMAIL_DOMAINS = ['pg.com'];
-const ALLOWED_ADMIN_EMAILS = ['dediosardie11@gmail.com'];
+const ALLOWED_ADMIN_EMAILS = ['ardie.dedios@yahoo.com'];
 
 /**
  * Validate if email is allowed to sign up
@@ -151,11 +151,38 @@ export const authService = {
       
       // Determine role based on email
       const isAdminEmail = ALLOWED_ADMIN_EMAILS.includes(email.toLowerCase().trim());
-      const userRole = isAdminEmail ? 'admin' : 'viewer';
+      const userRole = isAdminEmail ? 'administration' : 'driver';
       
-      // Call the database function to create user with hashed password
-      const { data, error } = await supabase
-        .rpc('create_user_account', {
+      // Step 1: Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName || email.split('@')[0],
+          }
+        }
+      });
+
+      if (authError) {
+        console.error('Supabase Auth signup error:', authError);
+        return {
+          user: null,
+          error: authError.message,
+        };
+      }
+
+      if (!authData.user) {
+        return {
+          user: null,
+          error: 'Failed to create user account',
+        };
+      }
+
+      // Step 2: Create user in shuttlup.users table with the same ID from Supabase Auth
+      const { error } = await supabase
+        .rpc('create_user_with_auth_id', {
+          p_user_id: authData.user.id, // Pass the Supabase Auth user ID
           p_email: email,
           p_password: password,
           p_full_name: fullName || email.split('@')[0],
@@ -164,7 +191,13 @@ export const authService = {
         });
 
       if (error) {
-        console.error('Signup error:', error);
+        console.error('Database user creation error:', error);
+        // Attempt to clean up the Supabase Auth user if database insertion fails
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup auth user:', cleanupError);
+        }
         return {
           user: null,
           error: error.message,
@@ -173,11 +206,11 @@ export const authService = {
 
       return {
         user: {
-          id: data.id,
-          email: data.email,
-          full_name: data.full_name,
-          role: data.role,
-          is_active: data.is_active,
+          id: authData.user.id, // Use the Supabase Auth user ID
+          email: email,
+          full_name: fullName || email.split('@')[0],
+          role: userRole,
+          is_active: isAdminEmail,
         },
         error: null,
       };

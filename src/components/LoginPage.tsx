@@ -72,7 +72,12 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         if (signUpError) {
           setError(signUpError || 'Failed to sign up');
         } else if (user) {
-          setSuccessMessage('Account created successfully! Your account is pending approval from an administrator.');
+          // Check if user is auto-activated (admin email)
+          if (user.is_active) {
+            setSuccessMessage('Account created successfully! You can now sign in with your credentials.');
+          } else {
+            setSuccessMessage('Account created successfully! Your account is pending approval from an administrator.');
+          }
           setTimeout(() => {
             setViewMode('login');
             setSuccessMessage('');
