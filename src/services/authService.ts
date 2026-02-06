@@ -297,6 +297,12 @@ export const authService = {
         return { user: null, error: 'Your account has been deactivated.' };
       }
 
+      // Start session monitoring if not already running
+      // This ensures monitoring continues after page refresh
+      if (!this.sessionCheckInterval) {
+        this.startSessionMonitoring();
+      }
+
       return {
         user: {
           id: data.id,
