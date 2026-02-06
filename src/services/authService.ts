@@ -160,15 +160,25 @@ export const authService = {
         options: {
           data: {
             full_name: fullName || email.split('@')[0],
-          }
+          },
+          emailRedirectTo: window.location.origin
         }
       });
 
       if (authError) {
         console.error('Supabase Auth signup error:', authError);
+        let errorMessage = authError.message;
+        
+        // Handle specific error cases
+        if (authError.message.includes('Signups not allowed')) {
+          errorMessage = 'Signups are currently disabled. Please contact your administrator.';
+        } else if (authError.message.includes('already registered')) {
+          errorMessage = 'This email is already registered. Please try logging in instead.';
+        }
+        
         return {
           user: null,
-          error: authError.message,
+          error: errorMessage,
         };
       }
 

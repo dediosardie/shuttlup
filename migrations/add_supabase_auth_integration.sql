@@ -2,8 +2,11 @@
 -- Description: Create function to insert user with specific UUID from Supabase Auth
 -- Date: 2026-02-06
 
+-- Set search path to shuttlup schema
+SET search_path TO shuttlup, public;
+
 -- Create function to insert user with a specific UUID (from Supabase Auth)
-CREATE OR REPLACE FUNCTION create_user_with_auth_id(
+CREATE OR REPLACE FUNCTION shuttlup.create_user_with_auth_id(
   p_user_id UUID,
   p_email TEXT,
   p_password TEXT,
@@ -23,17 +26,17 @@ SECURITY DEFINER
 AS $$
 BEGIN
   -- Check if email already exists
-  IF EXISTS (SELECT 1 FROM users WHERE users.email = p_email) THEN
+  IF EXISTS (SELECT 1 FROM shuttlup.users WHERE users.email = p_email) THEN
     RAISE EXCEPTION 'Email already exists';
   END IF;
 
   -- Check if user ID already exists
-  IF EXISTS (SELECT 1 FROM users WHERE users.id = p_user_id) THEN
+  IF EXISTS (SELECT 1 FROM shuttlup.users WHERE users.id = p_user_id) THEN
     RAISE EXCEPTION 'User ID already exists';
   END IF;
 
   -- Insert user with specific UUID from Supabase Auth
-  INSERT INTO users (id, email, password_hash, full_name, role, is_active)
+  INSERT INTO shuttlup.users (id, email, password_hash, full_name, role, is_active)
   VALUES (
     p_user_id,  -- Use the provided UUID from Supabase Auth
     p_email,
@@ -51,13 +54,13 @@ BEGIN
     u.full_name,
     u.role,
     u.is_active
-  FROM users u
+  FROM shuttlup.users u
   WHERE u.id = p_user_id;
 END;
 $$;
 
 -- Grant permissions
-GRANT EXECUTE ON FUNCTION create_user_with_auth_id(UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION shuttlup.create_user_with_auth_id(UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN) TO anon, authenticated;
 
 -- Add comment
-COMMENT ON FUNCTION create_user_with_auth_id IS 'Creates new user account with specific UUID from Supabase Auth and hashed password';
+COMMENT ON FUNCTION shuttlup.create_user_with_auth_id IS 'Creates new user account with specific UUID from Supabase Auth and hashed password';

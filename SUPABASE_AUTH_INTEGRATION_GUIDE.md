@@ -16,6 +16,18 @@ Before running this migration, ensure:
 
 ## How to Apply the Migration
 
+### Step 0: Setup Shuttlup Schema (Required First!)
+Before applying any migrations, create the shuttlup schema:
+
+1. Go to your Supabase Dashboard
+2. Navigate to **SQL Editor**
+3. Copy the contents of `migrations/move_to_shuttlup_schema.sql`
+4. Paste into the SQL Editor
+5. Click **Run** to execute
+6. This creates the schema and sets up permissions
+
+Then run your main database schema (MASTER_DATABASE_SCHEMA.sql) to create all tables in the shuttlup schema.
+
 ### Option 1: Using Supabase Dashboard (Recommended)
 1. Go to your Supabase Dashboard
 2. Navigate to **SQL Editor**
