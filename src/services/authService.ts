@@ -14,6 +14,33 @@ export interface AuthState {
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
 
+// Allowed email domains and specific emails
+const ALLOWED_EMAIL_DOMAINS = ['pg.com'];
+const ALLOWED_ADMIN_EMAILS = ['dediosardie11@gmail.com'];
+
+/**
+ * Validate if email is allowed to sign up
+ */
+export function validateEmailDomain(email: string): { isValid: boolean; error?: string } {
+  const emailLower = email.toLowerCase().trim();
+  
+  // Check if it's an allowed admin email
+  if (ALLOWED_ADMIN_EMAILS.includes(emailLower)) {
+    return { isValid: true };
+  }
+  
+  // Check if email domain is in allowed list
+  const domain = emailLower.split('@')[1];
+  if (domain && ALLOWED_EMAIL_DOMAINS.includes(domain)) {
+    return { isValid: true };
+  }
+  
+  return { 
+    isValid: false, 
+    error: `Sign up is restricted to @pg.com email addresses. Contact administrator for special access.` 
+  };
+}
+
 /**
  * Authentication Service
  * Handles custom authentication with session expiration and concurrent login management
@@ -113,14 +140,27 @@ export const authService = {
    */
   async signUp(email: string, password: string, fullName?: string): Promise<AuthResponse> {
     try {
+      // Validate email domain
+      const validation = validateEmailDomain(email);
+      if (!validation.isValid) {
+        return {
+          user: null,
+          error: validation.error || 'Email not allowed',
+        };
+      }
+      
+      // Determine role based on email
+      const isAdminEmail = ALLOWED_ADMIN_EMAILS.includes(email.toLowerCase().trim());
+      const userRole = isAdminEmail ? 'admin' : 'viewer';
+      
       // Call the database function to create user with hashed password
       const { data, error } = await supabase
         .rpc('create_user_account', {
           p_email: email,
           p_password: password,
           p_full_name: fullName || email.split('@')[0],
-          p_role: 'viewer',
-          p_is_active: false // Requires admin approval
+          p_role: userRole,
+          p_is_active: isAdminEmail // Admin emails are auto-activated
         });
 
       if (error) {

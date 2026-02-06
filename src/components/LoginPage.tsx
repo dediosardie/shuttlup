@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
-import { authService } from '../services/authService';
-import logo from '../assets/logo-dns.svg';
+import { authService, validateEmailDomain } from '../services/authService';
+import logo from '../assets/logo.svg';
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
@@ -27,6 +27,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     if (!email || !password) {
       setError('Email and password are required');
       return;
+    }
+
+    // Validate email domain for signup
+    if (viewMode === 'signup') {
+      const validation = validateEmailDomain(email);
+      if (!validation.isValid) {
+        setError(validation.error || 'Email not allowed');
+        return;
+      }
     }
 
     if (viewMode === 'signup' && password !== confirmPassword) {
@@ -128,9 +137,9 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <img src={logo} alt="DNS - Delta Neosolutions" className="w-auto h-24 drop-shadow-lg" />
+            <img src={logo} alt="Shutt'L Up" className="w-auto h-48 drop-shadow-lg" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary">VMMS</h1>
+          <h1 className="text-3xl font-bold text-text-primary">Shutt'L Up</h1>
           <p className="text-text-secondary mt-2">Vehicle Maintenance and Management System</p>
         </div>
 
@@ -196,20 +205,27 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
               {/* Full Name Field (only for signup) */}
               {viewMode === 'signup' && (
-                <div>
-                  <label htmlFor="fullName" className="block text-sm font-medium text-text-secondary mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-bg-elevated border border-border-muted rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
+                <>
+                  <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                    <p className="text-xs text-blue-400">
+                      ℹ️ Sign up is restricted to <strong>@pg.com</strong> email addresses only.
+                    </p>
+                  </div>
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-text-secondary mb-2">
+                      Full Name
+                    </label>
+                    <input
+                      id="fullName"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-bg-elevated border border-border-muted rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+                </>
               )}
 
               {/* Password Field (not shown in forgot-password) */}
@@ -289,6 +305,38 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
           {/* Toggle Between Login/Signup */}
           <div className="mt-6 text-center">
+            {viewMode === 'login' && (
+              <p className="text-sm text-text-secondary">
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('signup');
+                    setError('');
+                    setSuccessMessage('');
+                  }}
+                  className="text-accent hover:text-accent-hover font-medium transition-colors"
+                >
+                  Sign up
+                </button>
+              </p>
+            )}
+            {viewMode === 'signup' && (
+              <p className="text-sm text-text-secondary">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('login');
+                    setError('');
+                    setSuccessMessage('');
+                  }}
+                  className="text-accent hover:text-accent-hover font-medium transition-colors"
+                >
+                  Sign in
+                </button>
+              </p>
+            )}
             {(viewMode === 'forgot-password') && (
               <p className="text-sm text-text-secondary">
                 Already have an account?{' '}
