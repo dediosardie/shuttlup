@@ -1,8 +1,8 @@
 /**
- * RBAC UTILITIES - Re-exports for Convenience
+ * RBAC TYPE DEFINITIONS - Re-exports for Convenience
  * 
- * This file provides convenient re-exports of all RBAC-related
- * utilities, hooks, and components for easier imports.
+ * ⚠️ IMPORTANT: Access control is managed by PageRestrictionModule
+ * and the page_restrictions database table.
  */
 
 // Role definitions and types
@@ -13,13 +13,6 @@ export type {
 } from './config/rolePermissions';
 
 export {
-  ROLE_PERMISSIONS,
-  ROLE_MODULE_ACCESS,
-  ROLE_DESCRIPTIONS,
-  hasPermission,
-  hasModuleAccess,
-  getRolePermissions,
-  getRoleModules,
   isValidRole,
 } from './config/rolePermissions';
 

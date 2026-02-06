@@ -18,6 +18,7 @@ export default function PageRestrictionForm({ initialData, onSubmit, onCancel }:
     driver_access: false,
     administration_access: false,
     client_company_liaison_access: false,
+    passenger_access: false,
     is_active: true,
   });
 
@@ -34,6 +35,7 @@ export default function PageRestrictionForm({ initialData, onSubmit, onCancel }:
         driver_access: initialData.driver_access,
         administration_access: initialData.administration_access,
         client_company_liaison_access: initialData.client_company_liaison_access,
+        passenger_access: initialData.passenger_access,
         is_active: initialData.is_active,
       });
     }
@@ -191,6 +193,21 @@ export default function PageRestrictionForm({ initialData, onSubmit, onCancel }:
             <label htmlFor="client_company_liaison_access" className="ml-3 text-sm text-text-primary">
               <span className="font-medium">Client-Company Liaison</span>
               <span className="text-text-muted ml-2">- Coordinate with client companies</span>
+            </label>
+          </div>
+
+          {/* Passenger */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="passenger_access"
+              checked={formData.passenger_access}
+              onChange={(e) => handleChange('passenger_access', e.target.checked)}
+              className="h-4 w-4 rounded border-border-muted text-accent focus:ring-accent"
+            />
+            <label htmlFor="passenger_access" className="ml-3 text-sm text-text-primary">
+              <span className="font-medium">Passenger</span>
+              <span className="text-text-muted ml-2">- View transportation services and trip information</span>
             </label>
           </div>
         </div>

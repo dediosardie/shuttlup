@@ -8,14 +8,7 @@
 import { useState, useEffect } from 'react';
 import { 
   UserRole, 
-  Permission, 
-  Module,
-  hasPermission as checkPermission,
-  hasModuleAccess as checkModuleAccess,
-  getRolePermissions,
-  getRoleModules,
-  isValidRole,
-  ROLE_DESCRIPTIONS
+  isValidRole
 } from '../config/rolePermissions';
 
 export interface UserRoleData {
@@ -116,50 +109,52 @@ export function useRoleAccess() {
   }
 
   /**
-   * Check if current user has a specific permission
-   */
-  function hasPermission(permission: Permission): boolean {
-    if (!userRole) return false;
-    return checkPermission(userRole.role, permission);
-  }
-
-  /**
-   * Check if current user has access to a module
-   */
-  function hasModuleAccess(module: Module): boolean {
-    if (!userRole) return false;
-    return checkModuleAccess(userRole.role, module);
-  }
-
-  /**
-   * Get all permissions for current user
-   */
-  function getPermissions(): Permission[] {
-    if (!userRole) return [];
-    return getRolePermissions(userRole.role);
-  }
-
-  /**
-   * Get all accessible modules for current user
-   */
-  function getModules(): Module[] {
-    if (!userRole) return [];
-    return getRoleModules(userRole.role);
-  }
-
-  /**
-   * Get role description and responsibilities
+   * Get role description (placeholder - for display purposes only)
    */
   function getRoleDescription() {
     if (!userRole) return null;
-    return ROLE_DESCRIPTIONS[userRole.role];
-  }
-
-  /**
-   * Check if user is authenticated
-   */
-  function isAuthenticated(): boolean {
-    return userRole !== null;
+    
+    // Simplified role info for display
+    const roleDescriptions: Record<UserRole, { title: string; description: string; responsibilities: string[]; restrictions: string[] }> = {
+      fleet_manager: {
+        title: 'Fleet Manager',
+        description: 'Oversee entire fleet operations',
+        responsibilities: ['Manage fleet operations', 'Monitor vehicles', 'Ensure compliance'],
+        restrictions: ['Access controlled by page restrictions'],
+      },
+      maintenance_team: {
+        title: 'Maintenance Team',
+        description: 'Perform vehicle maintenance',
+        responsibilities: ['Execute maintenance tasks', 'Track repairs', 'Manage parts'],
+        restrictions: ['Access controlled by page restrictions'],
+      },
+      driver: {
+        title: 'Driver',
+        description: 'Operate vehicles and log activities',
+        responsibilities: ['Drive safely', 'Log trips', 'Report incidents'],
+        restrictions: ['Access controlled by page restrictions'],
+      },
+      passenger: {
+        title: 'Passenger',
+        description: 'View transportation services',
+        responsibilities: ['View trip information', 'Access passenger features'],
+        restrictions: ['Access controlled by page restrictions'],
+      },
+      administration: {
+        title: 'Administration',
+        description: 'Manage system operations',
+        responsibilities: ['System configuration', 'User management', 'Generate reports'],
+        restrictions: ['Access controlled by page restrictions'],
+      },
+      client_company_liaison: {
+        title: 'Client Liaison',
+        description: 'Coordinate with clients',
+        responsibilities: ['Manage client relations', 'Coordinate services'],
+        restrictions: ['Access controlled by page restrictions'],
+      },
+    };
+    
+    return roleDescriptions[userRole.role];
   }
 
   /**
@@ -180,14 +175,10 @@ export function useRoleAccess() {
   return {
     userRole,
     loading,
-    hasPermission,
-    hasModuleAccess,
-    getPermissions,
-    getModules,
-    getRoleDescription,
-    isAuthenticated,
+    isAuthenticated: !!userRole,
     hasRole,
     hasAnyRole,
-    refresh: loadUserRole,
+    getRoleDescription,
+    refreshRole: loadUserRole,
   };
 }

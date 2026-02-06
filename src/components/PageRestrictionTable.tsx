@@ -74,6 +74,9 @@ export default function PageRestrictionTable({
               Client Liaison
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+              Passenger
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
               Status
             </th>
             {canModify && (
@@ -86,7 +89,7 @@ export default function PageRestrictionTable({
         <tbody className="bg-bg-secondary divide-y divide-border-muted">
           {restrictions.length === 0 ? (
             <tr>
-              <td colSpan={canModify ? 9 : 8} className="px-6 py-4 text-center text-sm text-text-muted">
+              <td colSpan={canModify ? 10 : 9} className="px-6 py-4 text-center text-sm text-text-muted">
                 No page restrictions found
               </td>
             </tr>
@@ -127,6 +130,9 @@ export default function PageRestrictionTable({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {getRoleAccessBadge(restriction.client_company_liaison_access)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getRoleAccessBadge(restriction.passenger_access)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {getStatusBadge(restriction.is_active)}

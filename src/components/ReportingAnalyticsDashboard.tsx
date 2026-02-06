@@ -197,14 +197,14 @@ export default function ReportingAnalyticsDashboard() {
             <div className="flex items-center gap-2 overflow-x-auto">
               {/* Report types per markdown Section 2 */}
               {[
-                { id: 'dashboard', label: 'Dashboard Overview' },
+                // { id: 'dashboard', label: 'Dashboard Overview' },
                 { id: 'fleet', label: 'Fleet Performance' },
-                { id: 'insurance', label: 'Insurance Status' },
-                { id: 'maintenance', label: 'Maintenance Report' },
+                // { id: 'insurance', label: 'Insurance Status' },
+                // { id: 'maintenance', label: 'Maintenance Report' },
                 { id: 'driver', label: 'Driver Performance' },
                 { id: 'fuel', label: 'Fuel Efficiency' },
                 { id: 'incident', label: 'Incident Report' },
-                { id: 'financial', label: 'Financial Report' },
+                // { id: 'financial', label: 'Financial Report' },
                 { id: 'trip', label: 'Trip Analysis' },
               ].map(report => (
                 <Button

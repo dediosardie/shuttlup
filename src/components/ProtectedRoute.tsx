@@ -23,14 +23,14 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({
   children,
-  requiredPermission,
-  requiredModule,
+  // requiredPermission, // DEPRECATED - use PageRestrictionModule
+  // requiredModule, // DEPRECATED - use PageRestrictionModule
   requiredRole,
   requiredRoles,
   pagePath,
   fallback = <AccessDenied />,
 }: ProtectedRouteProps) {
-  const { userRole, loading, hasPermission, hasModuleAccess, hasRole, hasAnyRole } = useRoleAccess();
+  const { userRole, loading, hasRole, hasAnyRole } = useRoleAccess();
   const { hasPageAccess: checkPageAccess, loading: pageAccessLoading } = usePageAccess();
 
   // Show loading state only during initial load
@@ -46,18 +46,6 @@ export function ProtectedRoute({
   // PRIMARY: Check page-level restrictions from database (authoritative)
   if (pagePath && !checkPageAccess(pagePath)) {
     console.warn(`🔒 Access denied to page: ${pagePath} (page_restrictions)`);
-    return fallback;
-  }
-
-  // SECONDARY: Check permission (additional validation)
-  if (requiredPermission && !hasPermission(requiredPermission)) {
-    console.warn(`🔒 Access denied: missing permission ${requiredPermission}`);
-    return fallback;
-  }
-
-  // SECONDARY: Check module access (additional validation)
-  if (requiredModule && !hasModuleAccess(requiredModule)) {
-    console.warn(`🔒 Access denied to module: ${requiredModule}`);
     return fallback;
   }
 
@@ -92,23 +80,16 @@ interface ConditionalRenderProps {
 
 export function ConditionalRender({
   children,
-  requiredPermission,
-  requiredModule,
+  // requiredPermission, // DEPRECATED - use PageRestrictionModule
+  // requiredModule, // DEPRECATED - use PageRestrictionModule
   requiredRole,
   requiredRoles,
   fallback = null,
 }: ConditionalRenderProps) {
-  const { hasPermission, hasModuleAccess, hasRole, hasAnyRole } = useRoleAccess();
+  const { hasRole, hasAnyRole } = useRoleAccess();
 
-  // Check permission
-  if (requiredPermission && !hasPermission(requiredPermission)) {
-    return <>{fallback}</>;
-  }
-
-  // Check module access
-  if (requiredModule && !hasModuleAccess(requiredModule)) {
-    return <>{fallback}</>;
-  }
+  // Note: requiredPermission and requiredModule are deprecated
+  // Access control is now managed through PageRestrictionModule
 
   // Check specific role
   if (requiredRole && !hasRole(requiredRole)) {
@@ -161,7 +142,7 @@ function AccessDenied() {
               <div className="mb-3">
                 <h4 className="text-sm font-semibold text-gray-900 mb-1">Your Responsibilities:</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  {roleInfo.responsibilities.slice(0, 3).map((resp, index) => (
+                  {roleInfo.responsibilities.slice(0, 3).map((resp: string, index: number) => (
                     <li key={index} className="flex items-start">
                       <span className="text-green-500 mr-2">✓</span>
                       <span>{resp}</span>
@@ -173,7 +154,7 @@ function AccessDenied() {
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-1">Restrictions:</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  {roleInfo.restrictions.slice(0, 2).map((restriction, index) => (
+                  {roleInfo.restrictions.slice(0, 2).map((restriction: string, index: number) => (
                     <li key={index} className="flex items-start">
                       <span className="text-red-500 mr-2">✗</span>
                       <span>{restriction}</span>
@@ -230,6 +211,7 @@ export function RoleBadge() {
     fleet_manager: 'bg-purple-100 text-purple-800',
     maintenance_team: 'bg-orange-100 text-orange-800',
     driver: 'bg-blue-100 text-blue-800',
+    passenger: 'bg-cyan-100 text-cyan-800',
     administration: 'bg-red-100 text-red-800',
     client_company_liaison: 'bg-green-100 text-green-800',
   };

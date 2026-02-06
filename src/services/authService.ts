@@ -15,8 +15,8 @@ const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
 
 // Allowed email domains and specific emails
-const ALLOWED_EMAIL_DOMAINS = ['pg.com'];
-const ALLOWED_ADMIN_EMAILS = ['ardie.dedios@yahoo.com'];
+const ALLOWED_EMAIL_DOMAINS = ['pg.com', 'dentistahub.com'];
+const ALLOWED_ADMIN_EMAILS = ['dediosardie11@gmail.com', 'advillanuevajr@gmail.com'];
 
 /**
  * Validate if email is allowed to sign up
@@ -75,11 +75,37 @@ export const authService = {
 
       const user = data[0];
 
-      // Check if user is active
-      if (!user.is_active) {
+      // Check if email is confirmed in Supabase Auth by attempting to sign in
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (authError) {
+        console.error('Supabase Auth sign-in error:', authError);
         return {
           user: null,
-          error: 'Your account is inactive. Please contact an administrator for activation.',
+          error: 'Authentication failed. Please confirm your email address before signing in.',
+        };
+      }
+
+      // Check if email is confirmed
+      if (authData.user && !authData.user.email_confirmed_at) {
+        // Sign out from Supabase Auth since email is not confirmed
+        await supabase.auth.signOut();
+        return {
+          user: null,
+          error: 'Please confirm your email address before signing in. Check your inbox for the confirmation link.',
+        };
+      }
+
+      // Check if user account is active
+      if (!user.is_active) {
+        // Sign out from Supabase Auth since account is not active
+        await supabase.auth.signOut();
+        return {
+          user: null,
+          error: 'Your account is pending approval. Please wait for an administrator to activate your account before signing in.',
         };
       }
 
@@ -150,8 +176,9 @@ export const authService = {
       }
       
       // Determine role based on email
-      const isAdminEmail = ALLOWED_ADMIN_EMAILS.includes(email.toLowerCase().trim());
-      const userRole = isAdminEmail ? 'administration' : 'driver';
+      const emailLower = email.toLowerCase().trim();
+      const isAdminEmail = ALLOWED_ADMIN_EMAILS.includes(emailLower);
+      const userRole = isAdminEmail ? 'administration' : 'passenger';
       
       // Step 1: Create user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -197,7 +224,7 @@ export const authService = {
           p_password: password,
           p_full_name: fullName || email.split('@')[0],
           p_role: userRole,
-          p_is_active: isAdminEmail // Admin emails are auto-activated
+          p_is_active: true // Admin emails are auto-activated
         });
 
       if (error) {
@@ -220,7 +247,7 @@ export const authService = {
           email: email,
           full_name: fullName || email.split('@')[0],
           role: userRole,
-          is_active: isAdminEmail,
+          is_active: true,
         },
         error: null,
       };

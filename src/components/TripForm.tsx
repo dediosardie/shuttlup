@@ -803,7 +803,7 @@ export default function TripForm({ onSave, onUpdate, initialData, vehicles, driv
             onChange={handleChange}
             required
             min="0"
-            step="0.1"
+            step="1"
             disabled={isCalculatingDistance}
             helperText="Distance auto-calculates from OpenStreetMap"
           />

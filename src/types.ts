@@ -297,6 +297,7 @@ export interface PageRestriction {
   driver_access: boolean;
   administration_access: boolean;
   client_company_liaison_access: boolean;
+  passenger_access: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;

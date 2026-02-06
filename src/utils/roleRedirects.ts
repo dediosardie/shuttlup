@@ -17,6 +17,7 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   maintenance_team: '/vehicles',
   fleet_manager: '/reports',
   client_company_liaison: '/reports',
+  passenger: '/trips',
 };
 
 /**

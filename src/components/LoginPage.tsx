@@ -76,7 +76,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           if (user.is_active) {
             setSuccessMessage('Account created successfully! You can now sign in with your credentials.');
           } else {
-            setSuccessMessage('Account created successfully! Your account is pending approval from an administrator.');
+            setSuccessMessage('Account created successfully! Please wait for an administrator to approve your account before signing in.');
           }
           setTimeout(() => {
             setViewMode('login');
