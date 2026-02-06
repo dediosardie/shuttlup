@@ -95,6 +95,7 @@ export const pageRestrictionService = {
       'fleet_manager': 'fleet_manager_access',
       'maintenance_team': 'maintenance_team_access',
       'driver': 'driver_access',
+      'passenger': 'passenger_access',
       'administration': 'administration_access',
       'client_company_liaison': 'client_company_liaison_access',
     };
@@ -161,6 +162,7 @@ export const pageRestrictionService = {
       'fleet_manager': 'fleet_manager_access',
       'maintenance_team': 'maintenance_team_access',
       'driver': 'driver_access',
+      'passenger': 'passenger_access',
       'administration': 'administration_access',
       'client_company_liaison': 'client_company_liaison_access',
     };
@@ -191,6 +193,7 @@ export const pageRestrictionService = {
       'fleet_manager': 'fleet_manager_access',
       'maintenance_team': 'maintenance_team_access',
       'driver': 'driver_access',
+      'passenger': 'passenger_access',
       'administration': 'administration_access',
       'client_company_liaison': 'client_company_liaison_access',
     };
