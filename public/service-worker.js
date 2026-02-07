@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vmms-v1';
+const CACHE_NAME = "shuttlup-v1";
 const urlsToCache = [
   '/',
   '/index.html',
@@ -61,7 +61,7 @@ async function syncLocationData() {
 // Push notification support
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {};
-  const title = data.title || 'VMMS Notification';
+  const title = data.title || "Shutt'L Up Notification";
   const options = {
     body: data.body || 'New notification',
     icon: '/icon-192.png',

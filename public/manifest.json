@@ -1,7 +1,7 @@
 {
-  "name": "Vehicle Maintenance Management System",
-  "short_name": "VMMS",
-  "description": "Track vehicles, drivers, trips, and maintenance with real-time GPS tracking",
+  "name": "Shutt'L Up",
+  "short_name": "Shutt'L Up",
+  "description": "Safety, Comfort and On-Time",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
