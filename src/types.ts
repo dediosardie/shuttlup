@@ -286,6 +286,61 @@ export interface DisposalTransfer {
   notes?: string;
 }
 
+// Route Module - Maintenance group
+export interface Route {
+  id: string;
+  lines: number;
+  route: string;
+  part_number: string;
+  rate: number;
+  po_qty: number;
+  po_number?: string;
+  month?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Fleet Details Module
+export interface FleetDetail {
+  id: string;
+  status: 'active' | 'inactive';
+  van_number: string;
+  plate_number: string;
+  driver_name: string;
+  mobile_number: string;
+  unit: string;
+  area: string;
+  profit_centre: 'Delta' | 'Subcon ST';
+  remarks: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Trip Request Module
+export interface TripRequest {
+  id: string;
+  shuttle_no: string;
+  requestor: string;
+  requestor_user_id?: string;
+  reason: string;
+  reason_shortext: string;
+  date_requested: string;
+  date_of_service: string;
+  module: string;
+  arrival_time: string;
+  passenger_count: number;
+  in_out: string;
+  address: string;
+  van_driver: string;
+  details: string;
+  van_nos: string;
+  requestor_confirmed_service: string;
+  route: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Page Restrictions Module
 export interface PageRestriction {
   id: string;

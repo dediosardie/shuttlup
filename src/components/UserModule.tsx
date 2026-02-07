@@ -3,7 +3,7 @@ import { User } from '../types';
 import UserTable from './UserTable';
 import UserForm from './UserForm';
 import Modal from './Modal';
-import { Card, Button } from './ui';
+import { Card } from './ui';
 import { userService } from '../services/supabaseService';
 import { notificationService } from '../services/notificationService';
 import { auditLogService } from '../services/auditLogService';
@@ -126,11 +126,6 @@ export default function UserModule() {
     setIsModalOpen(true);
   };
 
-  const handleAddUser = () => {
-    setEditingUser(undefined);
-    setIsModalOpen(true);
-  };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingUser(undefined);
@@ -214,9 +209,9 @@ export default function UserModule() {
             <h2 className="text-xl font-semibold text-text-primary">User Management</h2>
             <p className="text-sm text-text-secondary mt-1">Manage system users and access control</p>
           </div>
-          {canManageUsers && (
+          {/* {canManageUsers && (
             <Button
-              onClick={handleAddUser}
+              onClick={() => { setEditingUser(undefined); setIsModalOpen(true); }}
               variant="primary"
               size="md"
               className="inline-flex items-center"
@@ -226,7 +221,7 @@ export default function UserModule() {
               </svg>
               Add User
             </Button>
-          )}
+          )} */}
         </div>
         
         {!canManageUsers && (
