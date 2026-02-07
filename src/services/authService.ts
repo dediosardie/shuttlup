@@ -15,7 +15,7 @@ const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
 
 // Allowed email domains and specific emails
-const ALLOWED_EMAIL_DOMAINS = ['pg.com', 'dentistahub.com'];
+const ALLOWED_EMAIL_DOMAINS = ['pg.com','dns.com.ph'];
 const ALLOWED_ADMIN_EMAILS = ['dediosardie11@gmail.com', 'advillanuevajr@gmail.com'];
 
 /**
