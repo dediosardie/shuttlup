@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Button, Input } from './ui';
 import { supabase } from '../supabaseClient';
+import { auditLogService } from '../services/auditLogService';
 
 interface Rate {
   id: string;
@@ -65,27 +66,47 @@ export default function RatesModule() {
     try {
       if (editingRate) {
         // Update existing rate
+        const updatedData = {
+          route: formData.route,
+          rate: parseFloat(formData.rate),
+          updated_at: new Date().toISOString(),
+        };
+        
         const { error } = await supabase
           .from('rates')
-          .update({
-            route: formData.route,
-            rate: parseFloat(formData.rate),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatedData)
           .eq('id', editingRate.id);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'UPDATE',
+          `Updated rate for route "${formData.route}"`,
+          { before: editingRate, after: updatedData }
+        );
+        
         alert('Rate updated successfully!');
       } else {
         // Create new rate
+        const newRate = {
+          route: formData.route,
+          rate: parseFloat(formData.rate),
+        };
+        
         const { error } = await supabase
           .from('rates')
-          .insert({
-            route: formData.route,
-            rate: parseFloat(formData.rate),
-          });
+          .insert(newRate);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'CREATE',
+          `Created rate for route "${formData.route}" (₱${parseFloat(formData.rate).toFixed(2)})`,
+          { after: newRate }
+        );
+        
         alert('Rate added successfully!');
       }
 
@@ -111,12 +132,24 @@ export default function RatesModule() {
     if (!confirm('Are you sure you want to delete this rate?')) return;
 
     try {
+      // Get rate details before deletion for audit log
+      const rateToDelete = rates.find(r => r.id === id);
+      
       const { error } = await supabase
         .from('rates')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Audit log
+      if (rateToDelete) {
+        await auditLogService.createLog(
+          'DELETE',
+          `Deleted rate for route "${rateToDelete.route}" (Line: ${rateToDelete.line}, Rate: ₱${rateToDelete.rate.toFixed(2)})`
+        );
+      }
+      
       alert('Rate deleted successfully!');
       loadRates();
     } catch (error) {

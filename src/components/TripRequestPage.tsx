@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TripRequest, FleetDetail, Route } from '../types';
 import { Card, Button, Input, Textarea, Select } from './ui';
 import { supabase } from '../supabaseClient';
+import { auditLogService } from '../services/auditLogService';
 
 export default function TripRequestPage() {
   const [tripRequests, setTripRequests] = useState<TripRequest[]>([]);
@@ -33,10 +34,18 @@ export default function TripRequestPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    loadCurrentUser();
-    loadTripRequests();
-    loadFleetDetails();
+    const initializePage = async () => {
+      await loadCurrentUser();
+      loadFleetDetails();
+    };
+    initializePage();
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadTripRequests();
+    }
+  }, [currentUser]);
 
   const loadCurrentUser = async () => {
     try {
@@ -57,10 +66,17 @@ export default function TripRequestPage() {
   const loadTripRequests = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      
+      let query = supabase
         .from('trip_requests')
-        .select('*')
-        .order('date_requested', { ascending: false });
+        .select('*');
+      
+      // If user is a passenger, only load their own requests
+      if (currentUser?.role === 'passenger') {
+        query = query.eq('requestor_user_id', currentUser.id);
+      }
+      
+      const { data, error } = await query.order('date_requested', { ascending: false });
 
       if (error) throw error;
       setTripRequests(data || []);
@@ -154,18 +170,36 @@ export default function TripRequestPage() {
           .eq('id', editingRequest.id);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'UPDATE',
+          `Updated trip request #${formData.shuttle_no}`,
+          { before: editingRequest, after: formData }
+        );
+        
         alert('Trip request updated successfully!');
       } else {
         // Create new request
+        const newRequest = {
+          ...formData,
+          requestor: currentUser?.full_name || 'Unknown',
+          requestor_user_id: currentUser?.id,
+        };
+        
         const { error } = await supabase
           .from('trip_requests')
-          .insert({
-            ...formData,
-            requestor: currentUser?.full_name || 'Unknown',
-            requestor_user_id: currentUser?.id,
-          });
+          .insert(newRequest);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'CREATE',
+          `Created trip request #${formData.shuttle_no}`,
+          { after: newRequest }
+        );
+        
         alert('Trip request created successfully!');
       }
 
@@ -221,17 +255,97 @@ export default function TripRequestPage() {
     if (!confirm('Are you sure you want to delete this trip request?')) return;
 
     try {
+      // Get request details before deletion for audit log
+      const requestToDelete = tripRequests.find(r => r.id === id);
+      
       const { error } = await supabase
         .from('trip_requests')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Audit log
+      if (requestToDelete) {
+        await auditLogService.createLog(
+          'DELETE',
+          `Deleted trip request #${requestToDelete.shuttle_no} (Requestor: ${requestToDelete.requestor})`
+        );
+      }
+      
       alert('Trip request deleted successfully!');
       loadTripRequests();
     } catch (error) {
       console.error('Error deleting trip request:', error);
       alert('Failed to delete trip request');
+    }
+  };
+
+  const handleComplete = async (id: string) => {
+    if (!confirm('Mark this trip request as completed?')) return;
+
+    try {
+      // Get request details for audit log
+      const request = tripRequests.find(r => r.id === id);
+      
+      const { error } = await supabase
+        .from('trip_requests')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      // Audit log
+      if (request) {
+        await auditLogService.createLog(
+          'STATUS_CHANGE',
+          `Marked trip request #${request.shuttle_no} as COMPLETED (Requestor: ${request.requestor})`,
+          { before: { status: request.status }, after: { status: 'completed' } }
+        );
+      }
+      
+      alert('Trip request marked as completed!');
+      loadTripRequests();
+    } catch (error) {
+      console.error('Error completing trip request:', error);
+      alert('Failed to complete trip request');
+    }
+  };
+
+  const handleCancelled = async (id: string) => {
+    if (!confirm('Mark this trip request as cancelled?')) return;
+
+    try {
+      // Get request details for audit log
+      const request = tripRequests.find(r => r.id === id);
+      
+      const { error } = await supabase
+        .from('trip_requests')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      // Audit log
+      if (request) {
+        await auditLogService.createLog(
+          'STATUS_CHANGE',
+          `Marked trip request #${request.shuttle_no} as CANCELLED (Requestor: ${request.requestor})`,
+          { before: { status: request.status }, after: { status: 'cancelled' } }
+        );
+      }
+      
+      alert('Trip request marked as cancelled!');
+      loadTripRequests();
+    } catch (error) {
+      console.error('Error cancelling trip request:', error);
+      alert('Failed to cancel trip request');
     }
   };
 
@@ -419,6 +533,32 @@ export default function TripRequestPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              handleComplete(request.id);
+                            }}
+                            className="text-green-500 hover:text-green-400 transition-colors p-1"
+                            title="Complete"
+                            disabled={request.status === 'completed'}
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancelled(request.id);
+                            }}
+                            className="text-yellow-500 hover:text-yellow-400 transition-colors p-1"
+                            title="Cancel"
+                            disabled={request.status === 'cancelled'}
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleEdit(request);
                             }}
                             className="text-accent hover:text-accent-hover transition-colors p-1"
@@ -587,38 +727,42 @@ export default function TripRequestPage() {
                     />
                   </div>
 
-                  {/* Van Driver */}
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      Van Driver
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.van_driver}
-                      onChange={(e) => setFormData({ ...formData, van_driver: e.target.value })}
-                      className="w-full bg-bg-elevated border-border-muted text-text-primary"
-                      placeholder="Enter van driver"
-                    />
-                  </div>
+                  {/* Van Driver - Hidden for passengers */}
+                  {currentUser?.role !== 'passenger' && (
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        Van Driver
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.van_driver}
+                        onChange={(e) => setFormData({ ...formData, van_driver: e.target.value })}
+                        className="w-full bg-bg-elevated border-border-muted text-text-primary"
+                        placeholder="Enter van driver"
+                      />
+                    </div>
+                  )}
 
-                  {/* Van Nos */}
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      Van Number
-                    </label>
-                    <Select
-                      value={formData.van_nos}
-                      onChange={(e) => handleVanNumberChange(e.target.value)}
-                      className="w-full bg-bg-elevated border-border-muted text-text-primary"
-                    >
-                      <option value="">Select van number</option>
-                      {fleetDetails.map((fleet) => (
-                        <option key={fleet.id} value={fleet.van_number}>
-                          {fleet.van_number} - {fleet.plate_number}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
+                  {/* Van Nos - Hidden for passengers */}
+                  {currentUser?.role !== 'passenger' && (
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">
+                        Van Number
+                      </label>
+                      <Select
+                        value={formData.van_nos}
+                        onChange={(e) => handleVanNumberChange(e.target.value)}
+                        className="w-full bg-bg-elevated border-border-muted text-text-primary"
+                      >
+                        <option value="">Select van number</option>
+                        {fleetDetails.map((fleet) => (
+                          <option key={fleet.id} value={fleet.van_number}>
+                            {fleet.van_number} - {fleet.plate_number}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
 
                   {/* Confirmed Service */}
                   <div>

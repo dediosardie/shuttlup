@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Button, Input, Select, Textarea } from './ui';
 import { supabase } from '../supabaseClient';
+import { auditLogService } from '../services/auditLogService';
 
 interface FleetDetail {
   id: string;
@@ -84,15 +85,25 @@ export default function FleetDetailsModule() {
     try {
       if (editingFleet) {
         // Update existing fleet detail
+        const updatedData = {
+          ...formData,
+          updated_at: new Date().toISOString(),
+        };
+        
         const { error } = await supabase
           .from('fleet_details')
-          .update({
-            ...formData,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatedData)
           .eq('id', editingFleet.id);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'UPDATE',
+          `Updated fleet detail for van "${formData.van_number}" (${formData.plate_number})`,
+          { before: editingFleet, after: updatedData }
+        );
+        
         alert('Fleet detail updated successfully!');
       } else {
         // Create new fleet detail
@@ -101,6 +112,14 @@ export default function FleetDetailsModule() {
           .insert(formData);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'CREATE',
+          `Created fleet detail for van "${formData.van_number}" (${formData.plate_number})`,
+          { after: formData }
+        );
+        
         alert('Fleet detail added successfully!');
       }
 
@@ -133,12 +152,24 @@ export default function FleetDetailsModule() {
     if (!confirm('Are you sure you want to delete this fleet detail?')) return;
 
     try {
+      // Get fleet details before deletion for audit log
+      const fleetToDelete = fleetDetails.find(f => f.id === id);
+      
       const { error } = await supabase
         .from('fleet_details')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Audit log
+      if (fleetToDelete) {
+        await auditLogService.createLog(
+          'DELETE',
+          `Deleted fleet detail for van "${fleetToDelete.van_number}" (${fleetToDelete.plate_number}, Driver: ${fleetToDelete.driver_name})`
+        );
+      }
+      
       alert('Fleet detail deleted successfully!');
       loadFleetDetails();
     } catch (error) {

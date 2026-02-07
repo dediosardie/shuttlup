@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Route } from '../types';
 import { Card, Button, Input } from './ui';
 import { supabase } from '../supabaseClient';
+import { auditLogService } from '../services/auditLogService';
 
 export default function RouteModule() {
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -71,6 +72,13 @@ export default function RouteModule() {
             .from('routes')
             .update({ po_qty: newPOQty, updated_at: new Date().toISOString() })
             .eq('id', route.id);
+          
+          // Audit log
+          await auditLogService.createLog(
+            'AUTO_UPDATE',
+            `Auto-updated PO QTY for route "${route.route}" from ${route.po_qty} to ${newPOQty} based on trip requests`,
+            { before: { po_qty: route.po_qty }, after: { po_qty: newPOQty } }
+          );
         }
       }
 
@@ -193,6 +201,13 @@ export default function RouteModule() {
           .insert(routesToInsert);
 
         if (insertError) throw insertError;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'BULK_IMPORT',
+          `Bulk imported ${rates.length} routes from rates table (PO: ${formData.po_number}, Month: ${formData.month})`
+        );
+        
         alert(`Successfully imported ${rates.length} routes from rates!`);
         resetForm();
         loadRoutes();
@@ -205,20 +220,30 @@ export default function RouteModule() {
       if (!validateForm(false)) return;
       
       try {
+        const updatedData = {
+          route: formData.route,
+          part_number: formData.part_number,
+          rate: parseFloat(formData.rate),
+          po_qty: parseInt(formData.po_qty),
+          po_number: formData.po_number || null,
+          month: formData.month || null,
+          updated_at: new Date().toISOString(),
+        };
+        
         const { error } = await supabase
           .from('routes')
-          .update({
-            route: formData.route,
-            part_number: formData.part_number,
-            rate: parseFloat(formData.rate),
-            po_qty: parseInt(formData.po_qty),
-            po_number: formData.po_number || null,
-            month: formData.month || null,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatedData)
           .eq('id', editingRoute.id);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'UPDATE',
+          `Updated route "${formData.route}"`,
+          { before: editingRoute, after: updatedData }
+        );
+        
         alert('Route updated successfully!');
         resetForm();
         loadRoutes();
@@ -231,18 +256,28 @@ export default function RouteModule() {
       if (!validateForm(false)) return;
       
       try {
+        const newRoute = {
+          route: formData.route,
+          part_number: formData.part_number,
+          rate: parseFloat(formData.rate),
+          po_qty: parseInt(formData.po_qty),
+          po_number: formData.po_number || null,
+          month: formData.month || null,
+        };
+        
         const { error } = await supabase
           .from('routes')
-          .insert({
-            route: formData.route,
-            part_number: formData.part_number,
-            rate: parseFloat(formData.rate),
-            po_qty: parseInt(formData.po_qty),
-            po_number: formData.po_number || null,
-            month: formData.month || null,
-          });
+          .insert(newRoute);
 
         if (error) throw error;
+        
+        // Audit log
+        await auditLogService.createLog(
+          'CREATE',
+          `Created route "${formData.route}"`,
+          { after: newRoute }
+        );
+        
         alert('Route added successfully!');
         resetForm();
         loadRoutes();
@@ -288,12 +323,24 @@ export default function RouteModule() {
     if (!confirm('Are you sure you want to delete this route?')) return;
 
     try {
+      // Get route details before deletion for audit log
+      const routeToDelete = routes.find(r => r.id === id);
+      
       const { error } = await supabase
         .from('routes')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Audit log
+      if (routeToDelete) {
+        await auditLogService.createLog(
+          'DELETE',
+          `Deleted route "${routeToDelete.route}" (PO: ${routeToDelete.po_number || 'N/A'}, QTY: ${routeToDelete.po_qty})`
+        );
+      }
+      
       alert('Route deleted successfully!');
       loadRoutes();
     } catch (error) {
@@ -388,7 +435,7 @@ export default function RouteModule() {
               </div>
               <div>
                 <p className="text-xs text-text-muted">Total Amount</p>
-                <p className="text-2xl font-bold text-text-primary">₱ {totalAmount.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-text-primary">₱ {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
           </Card>
@@ -445,9 +492,9 @@ export default function RouteModule() {
                       <td className="px-3 sm:px-4 py-3 text-sm text-text-primary">{route.lines}</td>
                       <td className="px-3 sm:px-4 py-3 text-sm text-text-primary font-medium">{route.route}</td>
                       <td className="px-3 sm:px-4 py-3 text-sm text-text-secondary">{route.part_number}</td>
-                      <td className="px-3 sm:px-4 py-3 text-sm text-text-primary">₱{route.rate.toFixed(2)}</td>
+                      <td className="px-3 sm:px-4 py-3 text-sm text-text-primary">₱ {route.rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-3 sm:px-4 py-3 text-sm text-text-primary">{route.po_qty.toLocaleString()}</td>
-                      <td className="px-3 sm:px-4 py-3 text-sm text-text-primary font-medium">₱{(route.rate * route.po_qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 sm:px-4 py-3 text-sm text-text-primary font-medium">₱ {(route.rate * route.po_qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-3 sm:px-4 py-3 text-sm text-text-secondary">{route.po_number || '-'}</td>
                       <td className="px-3 sm:px-4 py-3 text-sm text-text-secondary">{formatMonthDisplay(route.month)}</td>
                       <td className="px-3 sm:px-4 py-3 text-center">

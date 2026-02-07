@@ -19,6 +19,7 @@ import BookingRequestPage from './components/BookingRequestPage';
 import RouteModule from './components/RouteModule';
 import RatesModule from './components/RatesModule';
 import FleetDetailsModule from './components/FleetDetailsModule';
+import AuditLogPage from './components/AuditLogPage';
 import LoginPage from './components/LoginPage';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import { ProtectedRoute, RoleBadge } from './components/ProtectedRoute';
@@ -28,7 +29,7 @@ import { authService } from './services/authService';
 import { Module } from './config/rolePermissions';
 import { getRoleDefaultPage, checkRoleAccess } from './utils/roleRedirects';
 
-type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users' | 'page_restrictions' | 'live_tracking' | 'attendance' | 'trip_request' | 'booking_request' | 'routes' | 'rates' | 'fleet_details';
+type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users' | 'page_restrictions' | 'live_tracking' | 'attendance' | 'trip_request' | 'booking_request' | 'routes' | 'rates' | 'fleet_details' | 'audit_logs';
 
 function App() {
   const [user, setUser] = useState<any | null>(null);
@@ -124,6 +125,7 @@ function App() {
         '/fleet-details': 'fleet_details',
         '/vehicles': 'vehicles',
         '/live-tracking': 'live_tracking',
+        '/audit-logs': 'audit_logs',
       };
 
       const targetModule = pathToModule[defaultPage];
@@ -157,6 +159,7 @@ function App() {
           'page_restrictions': '/page-restrictions',
           'live_tracking': '/live-tracking',
           'attendance': '/attendance',
+          'audit_logs': '/audit-logs',
         };
 
         const currentPath = moduleToPat[activeModule];
@@ -328,6 +331,11 @@ function App() {
     { id: 'page_restrictions' as ActiveModule, module: 'users' as Module, path: '/page-restrictions', label: 'Page Access', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    )},
+    { id: 'audit_logs' as ActiveModule, module: 'users' as Module, path: '/audit-logs', label: 'Audit Logs', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     )},
 
@@ -704,7 +712,7 @@ function App() {
             </div>
 
             {/* Administration Section */}
-            {accessibleNavItems.some(item => ['users', 'page_restrictions', 'rates'].includes(item.id)) && (
+            {accessibleNavItems.some(item => ['users', 'page_restrictions', 'rates', 'audit_logs'].includes(item.id)) && (
               <div>
                 {isSidebarExpanded && (
                   <div className="px-3 mb-2 pt-2 border-t border-border-muted">
@@ -716,7 +724,7 @@ function App() {
                 )}
                 <div className="space-y-1">
                   {accessibleNavItems
-                    .filter(item => ['users', 'page_restrictions', 'rates'].includes(item.id))
+                    .filter(item => ['users', 'page_restrictions', 'rates', 'audit_logs'].includes(item.id))
                     .map((item) => (
                       <button
                         key={item.id}
@@ -851,6 +859,11 @@ function App() {
             {activeModule === 'attendance' && (
               <ProtectedRoute pagePath="/attendance">
                 <DriverAttendancePage />
+              </ProtectedRoute>
+            )}
+            {activeModule === 'audit_logs' && (
+              <ProtectedRoute pagePath="/audit-logs">
+                <AuditLogPage />
               </ProtectedRoute>
             )}
           </div>
