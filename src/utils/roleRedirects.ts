@@ -13,11 +13,11 @@ import { pageRestrictionService } from '../services/pageRestrictionService';
  */
 export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   driver: '/attendance',
-  administration: '/reports',
+  administration: '/trip-request',
   maintenance_team: '/vehicles',
-  fleet_manager: '/reports',
-  client_company_liaison: '/reports',
-  passenger: '/trips',
+  fleet_manager: '/trip-request',
+  client_company_liaison: '/trip-request',
+  passenger: '/booking-request',
 };
 
 /**
