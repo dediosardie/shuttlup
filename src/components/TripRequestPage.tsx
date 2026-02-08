@@ -296,44 +296,52 @@ export default function TripRequestPage() {
     try {
       console.log(`Sending email notification to ${passenger.email} for trip ${tripRequest.shuttle_no}`);
       
-      // Get the current session to include auth token
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get Supabase URL and anon key (use anon key instead of user JWT)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
-      const { data, error } = await supabase.functions.invoke('send-trip-notification', {
-        headers: {
-          Authorization: `Bearer ${session?.access_token || ''}`
-        },
-        body: {
-          to: passenger.email,
-          passengerName: passenger.full_name,
-          tripDetails: {
-            shuttleNo: tripRequest.shuttle_no,
-            requestor: tripRequest.requestor,
-            dateOfService: new Date(tripRequest.date_of_service).toLocaleDateString(),
-            arrivalTime: tripRequest.arrival_time || 'TBA',
-            route: tripRequest.route || 'N/A',
-            address: tripRequest.address || 'N/A',
-            reason: tripRequest.reason,
-            vanDriver: tripRequest.van_driver || 'TBA',
-            vanNumber: tripRequest.van_nos || 'TBA',
-          }
+      const payload = {
+        to: passenger.email,
+        passengerName: passenger.full_name,
+        tripDetails: {
+          shuttleNo: tripRequest.shuttle_no,
+          requestor: tripRequest.requestor,
+          dateOfService: new Date(tripRequest.date_of_service).toLocaleDateString(),
+          arrivalTime: tripRequest.arrival_time || 'TBA',
+          route: tripRequest.route || 'N/A',
+          address: tripRequest.address || 'N/A',
+          reason: tripRequest.reason,
+          vanDriver: tripRequest.van_driver || 'TBA',
+          vanNumber: tripRequest.van_nos || 'TBA',
         }
+      };
+      
+      // Use direct fetch with anon key (same as dashboard test)
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-trip-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify(payload)
       });
-
-      if (error) {
-        console.error('Edge Function error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        // Don't throw error - email failure shouldn't block trip creation
+      
+      console.log('Email API response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Email sent successfully:', data);
         return;
-      }
-
-      if (data) {
-        console.log('Email sent successfully:', data);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Email failed:', response.status, errorText);
+        // Don't throw - email failure shouldn't block trip creation
+        return;
       }
     } catch (error: any) {
       console.error('Failed to send email notification:', error);
       console.error('Error message:', error?.message || 'Unknown error');
-      console.error('Error stack:', error?.stack);
       // Silently fail - email is not critical
     }
   };
