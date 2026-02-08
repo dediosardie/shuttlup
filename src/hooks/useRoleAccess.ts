@@ -32,13 +32,17 @@ export function useRoleAccess() {
         const userEmail = localStorage.getItem('user_email');
         const roleStr = localStorage.getItem('user_role');
 
-        console.log('useRoleAccess - Reading from localStorage:', { userId, userEmail, roleStr });
-        console.log('Valid roles are:', ['fleet_manager', 'maintenance_team', 'driver', 'administration', 'client_company_liaison']);
+        // console.log('useRoleAccess - Reading from localStorage:', { userId, userEmail, roleStr });
+        // console.log('Valid roles are:', ['fleet_manager', 'maintenance_team', 'driver', 'administration', 'client_company_liaison']);
 
         if (!mounted) return;
 
         if (!userId || !userEmail || !roleStr) {
-          console.error('Missing localStorage data:', { userId: !!userId, userEmail: !!userEmail, roleStr: !!roleStr });
+          // Only log as warning if partial data exists (indicates corruption)
+          if (userId || userEmail || roleStr) {
+            console.warn('Incomplete localStorage data:', { userId: !!userId, userEmail: !!userEmail, roleStr: !!roleStr });
+          }
+          // Silent when no data exists (user not logged in)
           setUserRole(null);
           setLoading(false);
           return;
