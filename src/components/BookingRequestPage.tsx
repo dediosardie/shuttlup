@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TripRequest, FleetDetail, TripRequestPassenger, User } from '../types';
 import { Card, Button } from './ui';
 import { supabase } from '../supabaseClient';
+import { auditLogService } from '../services/auditLogService';
 
 export default function BookingRequestPage() {
   const [bookings, setBookings] = useState<TripRequest[]>([]);
@@ -149,6 +150,17 @@ export default function BookingRequestPage() {
         .eq('passenger_user_id', currentUser.id);
 
       if (error) throw error;
+      
+      // Get booking details for audit log
+      const booking = bookings.find(b => b.id === tripId);
+      if (booking) {
+        await auditLogService.createLog(
+          'STATUS_CHANGE',
+          `Confirmed attendance for trip #${booking.shuttle_no} (${booking.requestor})`,
+          { before: { status: 'pending' }, after: { status: 'confirmed' } }
+        );
+      }
+      
       alert('Your attendance has been confirmed!');
       await loadBookings();
     } catch (error) {
@@ -172,6 +184,17 @@ export default function BookingRequestPage() {
         .eq('passenger_user_id', currentUser.id);
 
       if (error) throw error;
+      
+      // Get booking details for audit log
+      const booking = bookings.find(b => b.id === tripId);
+      if (booking) {
+        await auditLogService.createLog(
+          'STATUS_CHANGE',
+          `Cancelled attendance for trip #${booking.shuttle_no} (${booking.requestor})`,
+          { before: { status: getPassengerStatus(tripId) }, after: { status: 'cancelled' } }
+        );
+      }
+      
       alert('Your attendance has been cancelled.');
       await loadBookings();
     } catch (error) {
