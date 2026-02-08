@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Vehicle } from './types';
 import { notificationService, Notification } from './services/notificationService';
 import VehicleModule from './components/VehicleModule';
@@ -875,6 +876,9 @@ function App() {
         isOpen={showChangePassword} 
         onClose={() => setShowChangePassword(false)} 
       />
+      
+      {/* Vercel Analytics */}
+      <Analytics />
     </div>
   );
 }
