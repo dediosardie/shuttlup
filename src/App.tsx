@@ -38,7 +38,7 @@ function App() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [activeModule, setActiveModule] = useState<ActiveModule>('vehicles');
+  const [activeModule, setActiveModule] = useState<ActiveModule>('trip_request');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
@@ -139,6 +139,7 @@ function App() {
   // Check and enforce role-based access for current active module
   useEffect(() => {
     async function checkAccess() {
+      // Only check access if user is logged in and all data is loaded
       if (!authLoading && !roleLoading && !pageAccessLoading && user && userRole) {
         // Map activeModule to paths
         const moduleToPat: Record<ActiveModule, string> = {
@@ -175,11 +176,14 @@ function App() {
           if (redirectModule && redirectModule !== activeModule) {
             setActiveModule(redirectModule);
             
-            // Show notification about redirect
-            notificationService.warning(
-              'Access Denied',
-              `You don't have access to that page. Redirected to your default page.`
-            );
+            // Only show notification if user attempted to access a page (not on initial load)
+            // Skip notification if this is the first check after login
+            if (sessionStorage.getItem('login_completed')) {
+              notificationService.warning(
+                'Access Denied',
+                `You don't have access to that page. Redirected to your default page.`
+              );
+            }
           }
         }
       }
@@ -201,6 +205,9 @@ function App() {
     console.log('Session result:', { user: sessionUser, error });
     setUser(sessionUser);
     setAuthLoading(false);
+    
+    // Mark login as completed to enable access denied notifications
+    sessionStorage.setItem('login_completed', 'true');
     
     // Trigger storage event manually to update useRoleAccess hook
     // (storage events don't fire in the same tab that made the change)
