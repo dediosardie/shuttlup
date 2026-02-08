@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Edge Function</title>
+</head>
+<body>
+    <h1>Edge Function Test</h1>
+    <button onclick="testFunction()">Test Edge Function</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function testFunction() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Testing...';
+
+            try {
+                // Test 1: Check if endpoint exists
+                resultDiv.textContent += '\n\n1. Testing if endpoint exists...';
+                const response = await fetch('https://btsdfmfifqahijazssmy.supabase.co/functions/v1/send-trip-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // No auth - testing basic connectivity
+                    },
+                    body: JSON.stringify({
+                        to: 'test@example.com',
+                        passengerName: 'Test User',
+                        tripDetails: {
+                            shuttleNo: 'TEST-001',
+                            requestor: 'Admin',
+                            dateOfService: '2/8/2026',
+                            arrivalTime: '10:00 AM',
+                            route: 'Test Route',
+                            address: '123 Test St',
+                            reason: 'Testing',
+                            vanDriver: 'Test Driver',
+                            vanNumber: 'VAN-01'
+                        }
+                    })
+                });
+
+                resultDiv.textContent += '\n✓ Endpoint exists!';
+                resultDiv.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                
+                const text = await response.text();
+                resultDiv.textContent += `\n\nResponse Body:\n${text}`;
+
+                // Determine what the status means
+                if (response.status === 404) {
+                    resultDiv.textContent += '\n\n❌ RESULT: Edge function NOT deployed';
+                    resultDiv.textContent += '\n\nTo fix: Run "supabase functions deploy send-trip-notification"';
+                } else if (response.status === 401) {
+                    resultDiv.textContent += '\n\n⚠️ RESULT: Edge function IS deployed but requires authentication';
+                    resultDiv.textContent += '\n\nThe function code needs to handle requests without strict auth';
+                } else if (response.status === 500) {
+                    resultDiv.textContent += '\n\n⚠️ RESULT: Edge function IS deployed but has an error';
+                    resultDiv.textContent += '\n\nCheck the edge function logs in Supabase Dashboard';
+                } else if (response.status === 200) {
+                    resultDiv.textContent += '\n\n✅ RESULT: Edge function working!';
+                } else {
+                    resultDiv.textContent += `\n\n⚠️ RESULT: Unexpected status ${response.status}`;
+                }
+
+            } catch (error) {
+                resultDiv.textContent += '\n\n❌ ERROR: ' + error.message;
+                resultDiv.textContent += '\n\nMost likely: Edge function not deployed or network issue';
+            }
+        }
+
+        // Auto-run test on page load
+        window.onload = testFunction;
+    </script>
+</body>
+</html>

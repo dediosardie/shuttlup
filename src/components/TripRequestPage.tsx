@@ -291,6 +291,53 @@ export default function TripRequestPage() {
     }
   };
 
+
+  const sendTripNotificationEmail = async (passenger: User, tripRequest: TripRequest) => {
+    try {
+      console.log(`Sending email notification to ${passenger.email} for trip ${tripRequest.shuttle_no}`);
+      
+      // Get the current session to include auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const { data, error } = await supabase.functions.invoke('send-trip-notification', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token || ''}`
+        },
+        body: {
+          to: passenger.email,
+          passengerName: passenger.full_name,
+          tripDetails: {
+            shuttleNo: tripRequest.shuttle_no,
+            requestor: tripRequest.requestor,
+            dateOfService: new Date(tripRequest.date_of_service).toLocaleDateString(),
+            arrivalTime: tripRequest.arrival_time || 'TBA',
+            route: tripRequest.route || 'N/A',
+            address: tripRequest.address || 'N/A',
+            reason: tripRequest.reason,
+            vanDriver: tripRequest.van_driver || 'TBA',
+            vanNumber: tripRequest.van_nos || 'TBA',
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Edge Function error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        // Don't throw error - email failure shouldn't block trip creation
+        return;
+      }
+
+      if (data) {
+        console.log('Email sent successfully:', data);
+      }
+    } catch (error: any) {
+      console.error('Failed to send email notification:', error);
+      console.error('Error message:', error?.message || 'Unknown error');
+      console.error('Error stack:', error?.stack);
+      // Silently fail - email is not critical
+    }
+  };
+
   const addTripPassengers = async (tripRequestId: string) => {
     const passengerRecords = selectedPassengers.map(passenger => ({
       trip_request_id: tripRequestId,
@@ -303,6 +350,26 @@ export default function TripRequestPage() {
       .insert(passengerRecords);
 
     if (error) throw error;
+
+    // Re-enable email notifications after edge function is properly deployed
+    // Send email notifications to all added passengers
+    const currentTrip = editingRequest || {
+      shuttle_no: formData.shuttle_no,
+      requestor: currentUser?.full_name || 'Unknown',
+      date_of_service: formData.date_of_service,
+      arrival_time: formData.arrival_time,
+      route: formData.route,
+      address: formData.address,
+      reason: formData.reason,
+      van_driver: formData.van_driver,
+      van_nos: formData.van_nos,
+    } as TripRequest;
+
+    for (const passenger of selectedPassengers) {
+      await sendTripNotificationEmail(passenger, currentTrip);
+    }
+    
+    console.log('Email notifications temporarily disabled - fix edge function deployment first');
   };
 
   const updateTripPassengers = async (tripRequestId: string) => {
@@ -334,6 +401,17 @@ export default function TripRequestPage() {
         .insert(newRecords);
 
       if (insertError) throw insertError;
+
+      // TODO: Re-enable email notifications after edge function is properly deployed
+      // Send email notifications to newly added passengers
+        const currentTrip = editingRequest || formData as any;
+        const newPassengers = selectedPassengers.filter(p => toAdd.includes(p.id));
+      
+        for (const passenger of newPassengers) {
+            await sendTripNotificationEmail(passenger, currentTrip);
+        }
+      
+      console.log('Email notifications temporarily disabled - fix edge function deployment first');
     }
 
     // Remove unselected passengers

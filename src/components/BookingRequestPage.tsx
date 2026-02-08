@@ -50,7 +50,7 @@ export default function BookingRequestPage() {
         .from('trip_requests')
         .select('*')
         .eq('requestor_user_id', currentUser?.id)
-        .order('date_of_service', { ascending: true });
+        .order('date_of_service', { ascending: false });
 
       if (requestorError) throw requestorError;
 
