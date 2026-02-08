@@ -350,11 +350,11 @@ export default function BookingRequestPage() {
 
                     {/* Action Buttons - For attendance confirmation */}
                     {passengerStatus && (
-                      <div className="pt-2 grid grid-cols-2 gap-2">
+                      <div className={`pt-2 gap-2 ${booking.status === 'completed' ? 'flex' : 'grid grid-cols-2'}`}>
                         <Button
                           onClick={() => handleConfirm(booking.id)}
                           disabled={passengerStatus === 'confirmed'}
-                          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${booking.status === 'completed' ? 'w-full' : ''} ${
                             passengerStatus === 'confirmed'
                               ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
                               : 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg'
@@ -365,20 +365,22 @@ export default function BookingRequestPage() {
                           </svg>
                           {passengerStatus === 'confirmed' ? 'Confirmed' : 'Confirm'}
                         </Button>
-                        <Button
-                          onClick={() => handleCancel(booking.id)}
-                          disabled={passengerStatus === 'cancelled'}
-                          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                            passengerStatus === 'cancelled'
-                              ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
-                              : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg'
-                          }`}
-                        >
-                          <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          {passengerStatus === 'cancelled' ? 'Cancelled' : 'Cancel'}
-                        </Button>
+                        {booking.status !== 'completed' && (
+                          <Button
+                            onClick={() => handleCancel(booking.id)}
+                            disabled={passengerStatus === 'cancelled'}
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                              passengerStatus === 'cancelled'
+                                ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
+                                : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg'
+                            }`}
+                          >
+                            <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            {passengerStatus === 'cancelled' ? 'Cancelled' : 'Cancel'}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>

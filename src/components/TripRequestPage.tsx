@@ -82,8 +82,8 @@ export default function TripRequestPage() {
         query = query.eq('requestor_user_id', currentUser.id);
       }
       
-      // If user is passenger or driver, only load pending trips
-      if (currentUser?.role === 'passenger' || currentUser?.role === 'driver') {
+      // If user is driver, only load pending trips
+      if (currentUser?.role === 'driver') {
         query = query.eq('status', 'pending');
       }
       
@@ -713,19 +713,21 @@ export default function TripRequestPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCancelled(request.id);
-                            }}
-                            className="text-yellow-500 hover:text-yellow-400 transition-colors p-1"
-                            title="Cancel"
-                            disabled={request.status === 'cancelled'}
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
+                          {request.status !== 'completed' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelled(request.id);
+                              }}
+                              className="text-yellow-500 hover:text-yellow-400 transition-colors p-1"
+                              title="Cancel"
+                              disabled={request.status === 'cancelled'}
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -876,23 +878,25 @@ export default function TripRequestPage() {
                       </svg>
                       {request.status === 'completed' ? 'Completed' : 'Mark as Complete'}
                     </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCancelled(request.id);
-                      }}
-                      disabled={request.status === 'cancelled'}
-                      className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        request.status === 'cancelled'
-                          ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
-                          : 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg'
-                      }`}
-                    >
-                      <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {request.status === 'cancelled' ? 'Cancelled' : 'Mark as Cancelled'}
-                    </Button>
+                    {request.status !== 'completed' && (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCancelled(request.id);
+                        }}
+                        disabled={request.status === 'cancelled'}
+                        className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          request.status === 'cancelled'
+                            ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
+                            : 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg'
+                        }`}
+                      >
+                        <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {request.status === 'cancelled' ? 'Cancelled' : 'Mark as Cancelled'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

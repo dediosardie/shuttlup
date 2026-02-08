@@ -1,9 +1,7 @@
 const CACHE_NAME = "shuttlup-v1";
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/styles/global.css'
+  '/index.html'
 ];
 
 // Install event - cache resources
@@ -13,6 +11,10 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
+      })
+      .catch((error) => {
+        console.error('Cache addAll failed:', error);
+        // Continue anyway - don't fail installation
       })
   );
   self.skipWaiting();
