@@ -643,8 +643,8 @@ export default function TripRequestPage() {
           />
         </Card>
 
-        {/* Table - Desktop View */}
-        <Card className="hidden md:block bg-bg-secondary border border-border-muted overflow-hidden">
+        {/* Table - Tablet Landscape & Desktop View */}
+        <Card className="hidden lg:block bg-bg-secondary border border-border-muted overflow-hidden">
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table className="w-full">
               <thead className="bg-bg-elevated border-b border-border-muted sticky top-0 z-10">
@@ -760,8 +760,8 @@ export default function TripRequestPage() {
           </div>
         </Card>
 
-        {/* Card View - Mobile */}
-        <div className="md:hidden space-y-3">
+        {/* Card View - Mobile & Tablet Portrait */}
+        <div className="lg:hidden space-y-3">
           {isLoading ? (
             <Card className="p-6 bg-bg-secondary border border-border-muted text-center text-text-secondary">
               Loading trip requests...
