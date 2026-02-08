@@ -12,7 +12,7 @@ import { pageRestrictionService } from '../services/pageRestrictionService';
  * Default landing pages for each role
  */
 export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
-  driver: '/attendance',
+  driver: '/trip-request',
   administration: '/trip-request',
   maintenance_team: '/vehicles',
   fleet_manager: '/trip-request',

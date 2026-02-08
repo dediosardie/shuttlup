@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TripRequest, FleetDetail, Route } from '../types';
+import { TripRequest, FleetDetail, Route, User, TripRequestPassenger } from '../types';
 import { Card, Button, Input, Textarea, Select } from './ui';
 import { supabase } from '../supabaseClient';
 import { auditLogService } from '../services/auditLogService';
@@ -8,6 +8,11 @@ export default function TripRequestPage() {
   const [tripRequests, setTripRequests] = useState<TripRequest[]>([]);
   const [fleetDetails, setFleetDetails] = useState<FleetDetail[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [passengers, setPassengers] = useState<User[]>([]);
+  const [selectedPassengers, setSelectedPassengers] = useState<User[]>([]);
+  const [passengerSearch, setPassengerSearch] = useState('');
+  const [showPassengerDropdown, setShowPassengerDropdown] = useState(false);
+  const [tripPassengers, setTripPassengers] = useState<Record<string, TripRequestPassenger[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<TripRequest | null>(null);
@@ -37,6 +42,7 @@ export default function TripRequestPage() {
     const initializePage = async () => {
       await loadCurrentUser();
       loadFleetDetails();
+      loadPassengers();
     };
     initializePage();
   }, []);
@@ -76,15 +82,72 @@ export default function TripRequestPage() {
         query = query.eq('requestor_user_id', currentUser.id);
       }
       
+      // If user is passenger or driver, only load pending trips
+      if (currentUser?.role === 'passenger' || currentUser?.role === 'driver') {
+        query = query.eq('status', 'pending');
+      }
+      
       const { data, error } = await query.order('date_requested', { ascending: false });
 
       if (error) throw error;
       setTripRequests(data || []);
+      
+      // Load passengers for each trip
+      if (data && data.length > 0) {
+        await loadTripPassengers(data.map(t => t.id));
+      }
     } catch (error) {
       console.error('Error loading trip requests:', error);
       alert('Failed to load trip requests');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadTripPassengers = async (tripIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('trip_request_passengers')
+        .select(`
+          *,
+          passenger:users!trip_request_passengers_passenger_user_id_fkey(
+            id,
+            full_name,
+            email,
+            role
+          )
+        `)
+        .in('trip_request_id', tripIds);
+
+      if (error) throw error;
+
+      // Group passengers by trip_request_id
+      const grouped = (data || []).reduce((acc, item) => {
+        if (!acc[item.trip_request_id]) {
+          acc[item.trip_request_id] = [];
+        }
+        acc[item.trip_request_id].push(item as TripRequestPassenger);
+        return acc;
+      }, {} as Record<string, TripRequestPassenger[]>);
+
+      setTripPassengers(grouped);
+    } catch (error) {
+      console.error('Error loading trip passengers:', error);
+    }
+  };
+
+  const loadPassengers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw error;
+      setPassengers(data || []);
+    } catch (error) {
+      console.error('Error loading passengers:', error);
     }
   };
 
@@ -141,14 +204,14 @@ export default function TripRequestPage() {
     if (!formData.shuttle_no.trim()) {
       newErrors.shuttle_no = 'Shuttle number is required';
     }
-    if (!formData.passenger_count) {
-      newErrors.passenger_count = 'Passenger count is required';
-    }
     if (!formData.date_of_service) {
       newErrors.date_of_service = 'Date of service is required';
     }
     if (!formData.reason.trim()) {
       newErrors.reason = 'Reason is required';
+    }
+    if (selectedPassengers.length === 0) {
+      newErrors.passengers = 'At least one passenger is required';
     }
 
     setErrors(newErrors);
@@ -165,17 +228,24 @@ export default function TripRequestPage() {
           .from('trip_requests')
           .update({
             ...formData,
+            passenger_count: selectedPassengers.length,
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingRequest.id);
 
         if (error) throw error;
         
+        // Update passengers
+        await updateTripPassengers(editingRequest.id);
+        
         // Audit log
         await auditLogService.createLog(
           'UPDATE',
           `Updated trip request #${formData.shuttle_no}`,
-          { before: editingRequest, after: formData }
+          { 
+            before: editingRequest, 
+            after: { ...formData, passengers: selectedPassengers.map(p => p.full_name) }
+          }
         );
         
         alert('Trip request updated successfully!');
@@ -185,19 +255,29 @@ export default function TripRequestPage() {
           ...formData,
           requestor: currentUser?.full_name || 'Unknown',
           requestor_user_id: currentUser?.id,
+          passenger_count: selectedPassengers.length,
         };
         
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('trip_requests')
-          .insert(newRequest);
+          .insert(newRequest)
+          .select()
+          .single();
 
         if (error) throw error;
+        
+        // Add passengers
+        if (data && selectedPassengers.length > 0) {
+          await addTripPassengers(data.id);
+        }
         
         // Audit log
         await auditLogService.createLog(
           'CREATE',
           `Created trip request #${formData.shuttle_no}`,
-          { after: newRequest }
+          { 
+            after: { ...newRequest, passengers: selectedPassengers.map(p => p.full_name) }
+          }
         );
         
         alert('Trip request created successfully!');
@@ -208,6 +288,63 @@ export default function TripRequestPage() {
     } catch (error) {
       console.error('Error saving trip request:', error);
       alert('Failed to save trip request');
+    }
+  };
+
+  const addTripPassengers = async (tripRequestId: string) => {
+    const passengerRecords = selectedPassengers.map(passenger => ({
+      trip_request_id: tripRequestId,
+      passenger_user_id: passenger.id,
+      status: 'pending' as const,
+    }));
+
+    const { error } = await supabase
+      .from('trip_request_passengers')
+      .insert(passengerRecords);
+
+    if (error) throw error;
+  };
+
+  const updateTripPassengers = async (tripRequestId: string) => {
+    // Get existing passengers
+    const { data: existingPassengers, error: fetchError } = await supabase
+      .from('trip_request_passengers')
+      .select('passenger_user_id')
+      .eq('trip_request_id', tripRequestId);
+
+    if (fetchError) throw fetchError;
+
+    const existingIds = existingPassengers?.map(p => p.passenger_user_id) || [];
+    const selectedIds = selectedPassengers.map(p => p.id);
+
+    // Find passengers to add and remove
+    const toAdd = selectedIds.filter(id => !existingIds.includes(id));
+    const toRemove = existingIds.filter(id => !selectedIds.includes(id));
+
+    // Add new passengers
+    if (toAdd.length > 0) {
+      const newRecords = toAdd.map(passengerId => ({
+        trip_request_id: tripRequestId,
+        passenger_user_id: passengerId,
+        status: 'pending' as const,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('trip_request_passengers')
+        .insert(newRecords);
+
+      if (insertError) throw insertError;
+    }
+
+    // Remove unselected passengers
+    if (toRemove.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('trip_request_passengers')
+        .delete()
+        .eq('trip_request_id', tripRequestId)
+        .in('passenger_user_id', toRemove);
+
+      if (deleteError) throw deleteError;
     }
   };
 
@@ -242,6 +379,14 @@ export default function TripRequestPage() {
           route: data.route,
           status: data.status,
         });
+        
+        // Load passengers for this trip
+        const passengerData = tripPassengers[data.id] || [];
+        const tripPassengerUsers = passengerData
+          .map(tp => tp.passenger)
+          .filter(p => p) as User[];
+        setSelectedPassengers(tripPassengerUsers);
+        
         setIsFormOpen(true);
         setErrors({});
       }
@@ -385,6 +530,31 @@ export default function TripRequestPage() {
     setEditingRequest(null);
     setIsFormOpen(false);
     setErrors({});
+    setSelectedPassengers([]);
+    setPassengerSearch('');
+    setShowPassengerDropdown(false);
+  };
+
+  const handleAddPassenger = (passenger: User) => {
+    if (!selectedPassengers.find(p => p.id === passenger.id)) {
+      setSelectedPassengers([...selectedPassengers, passenger]);
+    }
+    setPassengerSearch('');
+    setShowPassengerDropdown(false);
+  };
+
+  const handleRemovePassenger = (passengerId: string) => {
+    setSelectedPassengers(selectedPassengers.filter(p => p.id !== passengerId));
+  };
+
+  const filteredPassengerOptions = passengers.filter(p =>
+    p.full_name.toLowerCase().includes(passengerSearch.toLowerCase()) ||
+    p.email.toLowerCase().includes(passengerSearch.toLowerCase())
+  ).filter(p => !selectedPassengers.find(sp => sp.id === p.id));
+
+  const getConfirmedCount = (tripId: string): number => {
+    const passengers = tripPassengers[tripId] || [];
+    return passengers.filter(p => p.status === 'confirmed').length;
   };
 
   const filteredRequests = tripRequests.filter(request =>
@@ -473,8 +643,8 @@ export default function TripRequestPage() {
           />
         </Card>
 
-        {/* Table */}
-        <Card className="bg-bg-secondary border border-border-muted overflow-hidden">
+        {/* Table - Desktop View */}
+        <Card className="hidden md:block bg-bg-secondary border border-border-muted overflow-hidden">
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table className="w-full">
               <thead className="bg-bg-elevated border-b border-border-muted sticky top-0 z-10">
@@ -590,6 +760,146 @@ export default function TripRequestPage() {
           </div>
         </Card>
 
+        {/* Card View - Mobile */}
+        <div className="md:hidden space-y-3">
+          {isLoading ? (
+            <Card className="p-6 bg-bg-secondary border border-border-muted text-center text-text-secondary">
+              Loading trip requests...
+            </Card>
+          ) : filteredRequests.length === 0 ? (
+            <Card className="p-6 bg-bg-secondary border border-border-muted text-center text-text-secondary">
+              No trip requests found
+            </Card>
+          ) : (
+            filteredRequests.map((request) => (
+              <div
+                key={request.id}
+                className="p-4 bg-bg-secondary border border-border-muted rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                onClick={() => handleEdit(request)}
+                onDoubleClick={() => handleEdit(request)}
+              >
+                <div className="space-y-3">
+                  {/* Row 1: Requestor */}
+                  <div>
+                    <p className="text-xs text-text-muted">Requestor:</p>
+                    <p className="text-sm font-medium text-text-primary">{request.requestor}</p>
+                  </div>
+
+                  {/* Row 2: No. of Passengers and Confirmed Passengers */}
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs text-text-muted">No. of Passengers:</p>
+                      <p className="text-sm text-text-primary">{request.passenger_count}</p>
+                      {tripPassengers[request.id] && tripPassengers[request.id].length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {tripPassengers[request.id].map((tp, idx) => (
+                            <p key={idx} className={`text-xs ${
+                              tp.status === 'confirmed' 
+                                ? 'text-green-400' 
+                                : tp.status === 'cancelled'
+                                ? 'text-red-400'
+                                : 'text-orange-400'
+                            }`}>
+                              • {tp.passenger?.full_name}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-text-muted">Confirmed Passengers:</p>
+                      <p className="text-sm text-text-primary">{getConfirmedCount(request.id)}</p>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Date of Service and Time */}
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs text-text-muted">Date of Service:</p>
+                      <p className="text-sm text-text-primary">{new Date(request.date_of_service).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-text-muted">Time:</p>
+                      <p className="text-sm text-text-primary">{request.arrival_time || '-'}</p>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Driver's Name and Contact */}
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs text-text-muted">Driver's Name:</p>
+                      <p className="text-sm text-text-primary">{request.van_driver || '-'}</p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-text-muted">Contact No.:</p>
+                      <p className="text-sm text-text-primary">
+                        {fleetDetails.find(f => f.van_number === request.van_nos)?.mobile_number || '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Status Badge and Route */}
+                  <div className="flex justify-between items-center gap-4">
+                    <div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        request.status === 'completed'
+                          ? 'bg-green-900/30 text-green-400'
+                          : request.status === 'cancelled'
+                          ? 'bg-red-900/30 text-red-400'
+                          : 'bg-yellow-900/30 text-yellow-400'
+                      }`}>
+                        {request.status}
+                      </span>
+                    </div>
+                    <div className="flex-1 text-right">
+                      <p className="text-xs text-text-muted">Route:</p>
+                      <p className="text-sm text-text-primary">{request.route || '-'}</p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="pt-2 space-y-2">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleComplete(request.id);
+                      }}
+                      disabled={request.status === 'completed'}
+                      className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        request.status === 'completed'
+                          ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
+                          : 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg'
+                      }`}
+                    >
+                      <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {request.status === 'completed' ? 'Completed' : 'Mark as Complete'}
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCancelled(request.id);
+                      }}
+                      disabled={request.status === 'cancelled'}
+                      className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        request.status === 'cancelled'
+                          ? 'bg-bg-elevated text-text-muted cursor-not-allowed'
+                          : 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg'
+                      }`}
+                    >
+                      <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {request.status === 'cancelled' ? 'Cancelled' : 'Mark as Cancelled'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         {/* Form Modal */}
         {isFormOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -628,16 +938,78 @@ export default function TripRequestPage() {
                   {/* Passenger Count */}
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-2">
-                      Passenger Count <span className="text-red-500">*</span>
+                      Passenger Count
                     </label>
                     <Input
                       type="number"
-                      value={formData.passenger_count}
-                      onChange={(e) => setFormData({ ...formData, passenger_count: e.target.value === '' ? 0 : Number(e.target.value) })}
-                      className="w-full bg-bg-elevated border-border-muted text-text-primary"
-                      placeholder="Enter passenger count"
+                      value={selectedPassengers.length}
+                      disabled
+                      className="w-full bg-bg-elevated border-border-muted text-text-primary opacity-60"
+                      placeholder="Auto-calculated"
                     />
-                    {errors.passenger_count && <p className="text-red-500 text-xs mt-1">{errors.passenger_count}</p>}
+                    <p className="text-xs text-text-muted mt-1">Automatically calculated from selected passengers</p>
+                  </div>
+
+                  {/* Passenger Selection */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-text-primary mb-2">
+                      Select Passengers <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={passengerSearch}
+                        onChange={(e) => {
+                          setPassengerSearch(e.target.value);
+                          setShowPassengerDropdown(true);
+                        }}
+                        onFocus={() => setShowPassengerDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowPassengerDropdown(false), 200)}
+                        className="w-full bg-bg-elevated border-border-muted text-text-primary"
+                        placeholder="Search passengers by name or email..."
+                      />
+                      
+                      {/* Dropdown */}
+                      {showPassengerDropdown && filteredPassengerOptions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-bg-elevated border border-border-muted rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {filteredPassengerOptions.map((passenger) => (
+                            <button
+                              key={passenger.id}
+                              type="button"
+                              onClick={() => handleAddPassenger(passenger)}
+                              className="w-full px-3 py-2 text-left hover:bg-bg-primary transition-colors text-sm text-text-primary"
+                            >
+                              <div className="font-medium">{passenger.full_name}</div>
+                              <div className="text-xs text-text-muted">{passenger.email}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {errors.passengers && <p className="text-red-500 text-xs mt-1">{errors.passengers}</p>}
+                    
+                    {/* Selected Passengers */}
+                    {selectedPassengers.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {selectedPassengers.map((passenger) => (
+                          <div
+                            key={passenger.id}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent-soft text-accent rounded-full text-sm"
+                          >
+                            <span>{passenger.full_name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePassenger(passenger.id)}
+                              className="hover:text-red-400 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Date Requested */}

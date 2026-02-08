@@ -341,6 +341,18 @@ export interface TripRequest {
   updated_at?: string;
 }
 
+// Trip Request Passenger Junction Table
+export interface TripRequestPassenger {
+  id: string;
+  trip_request_id: string;
+  passenger_user_id: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  created_at?: string;
+  updated_at?: string;
+  // Joined data from users table
+  passenger?: User;
+}
+
 // Page Restrictions Module
 export interface PageRestriction {
   id: string;
