@@ -19,8 +19,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [successMessage, setSuccessMessage] = useState('');
   const [lastResetRequestTime, setLastResetRequestTime] = useState<number>(0);
   const [resetCooldown, setResetCooldown] = useState<number>(0);
-  const [lastResetRequestTime, setLastResetRequestTime] = useState<number>(0);
-  const [resetCooldown, setResetCooldown] = useState<number>(0);
 
   // Check for password reset mode on mount
   useEffect(() => {
