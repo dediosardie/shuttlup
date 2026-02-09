@@ -12,7 +12,7 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
   const [formData, setFormData] = useState<Omit<User, 'id' | 'created_at' | 'updated_at'> & { password?: string }>({
     email: initialData?.email || '',
     full_name: initialData?.full_name || '',
-    role: initialData?.role || 'driver',
+    role: initialData?.role || 'passenger',
     is_active: initialData?.is_active ?? true,
     password: '',
   });
@@ -30,7 +30,7 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
       setFormData({
         email: '',
         full_name: '',
-        role: 'driver',
+        role: 'passenger',
         is_active: true,
         password: '',
       });

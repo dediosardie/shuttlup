@@ -24,7 +24,7 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'fleet_manager' | 'maintenance_team' | 'driver' | 'administration' | 'client_company_liaison';
+  role: 'fleet_manager' | 'maintenance_team' | 'driver' | 'administration' | 'passenger' | 'client_company_liaison';
   is_active: boolean;
   session_id?: string | null;
   created_at?: string;
