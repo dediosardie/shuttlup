@@ -51,6 +51,18 @@ function App() {
   // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
+      // Check if this is a password reset flow (bypass auth check for faster load)
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const isPasswordReset = urlParams.get('reset') === 'true' || hashParams.get('type') === 'recovery';
+      
+      if (isPasswordReset) {
+        console.log('Password reset detected - bypassing auth check');
+        setUser(null);
+        setAuthLoading(false);
+        return;
+      }
+      
       // Check if there's a valid session
       const { user: sessionUser } = await authService.getSession();
       setUser(sessionUser);
