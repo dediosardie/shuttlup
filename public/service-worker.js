@@ -1,7 +1,6 @@
-const CACHE_NAME = "shuttlup-v1";
+const CACHE_NAME = "shuttlup-v2";
 const urlsToCache = [
-  '/',
-  '/index.html'
+  // Don't pre-cache HTML to prevent stale content
 ];
 
 // Install event - cache resources
@@ -37,13 +36,26 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
+        // Clone the response before caching
+        const responseToCache = response.clone();
+        
+        // Don't cache HTML files or API requests
+        if (!event.request.url.includes('.html') && !event.request.url.includes('supabase')) {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        
+        return response;
+      })
+      .catch(() => {
+        // Fallback to cache only if network fails
+        return caches.match(event.request);
       })
   );
 });
