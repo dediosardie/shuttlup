@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { authService, validateEmailDomain } from '../services/authService';
 import logo from '../assets/logo.svg';
 
@@ -17,6 +17,33 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Check for password reset mode on mount
+  useEffect(() => {
+    // Log current URL for debugging
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Search params:', window.location.search);
+    console.log('🔍 Hash params:', window.location.hash);
+    
+    // Check if URL has reset parameter (from Supabase email link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReset = urlParams.get('reset');
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+
+    console.log('🔍 Reset param:', isReset);
+    console.log('🔍 Access token exists:', !!accessToken);
+    console.log('🔍 Type:', type);
+
+    if (isReset === 'true' || (type === 'recovery' && accessToken)) {
+      console.log('✅ Password reset mode detected - showing reset form');
+      setViewMode('reset-password');
+      setSuccessMessage('Enter your new password below');
+    } else {
+      console.log('ℹ️ No password reset detected - showing login form');
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -84,15 +111,22 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           }, 5000);
         }
       } else if (viewMode === 'reset-password') {
+        // Use Supabase Auth to update password
         const { error: updateError } = await authService.updatePassword(password);
         
         if (updateError) {
-          setError(updateError || 'Failed to update password');
+          setError(updateError || 'Failed to reset password');
         } else {
-          setSuccessMessage('Password updated successfully!');
+          setSuccessMessage('Password reset successfully! Redirecting to login...');
+          
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
           setTimeout(() => {
             setViewMode('login');
             setSuccessMessage('');
+            setPassword('');
+            setConfirmPassword('');
           }, 2000);
         }
       }
@@ -122,11 +156,18 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       if (resetError) {
         setError(resetError || 'Failed to send reset email');
       } else {
-        setSuccessMessage('Password reset email sent! Check your inbox.');
+        setSuccessMessage('Password reset email sent! Check your inbox (and spam folder). The email may take a few minutes to arrive.');
+        
+        // Show additional help message
+        console.log('📧 Password reset email sent to:', email);
+        console.log('⚠️ Important: Check your spam/junk folder');
+        console.log('⏱️ Email may take 1-5 minutes to arrive');
+        console.log('🔍 If no email after 5 minutes, check Supabase Dashboard → Logs');
+        
         setTimeout(() => {
           setViewMode('login');
           setSuccessMessage('');
-        }, 3000);
+        }, 8000); // Give user more time to read the message
       }
     } catch (err) {
       setError('An unexpected error occurred');

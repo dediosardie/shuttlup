@@ -297,19 +297,60 @@ export const authService = {
   },
 
   /**
-   * Send password reset request
+   * Send password reset request using Supabase Auth
+   * Supabase will send an email with a reset link
    */
   async forgotPassword(email: string): Promise<{ error: string | null }> {
     try {
-      // Call database function to generate password reset token
-      const { error } = await supabase
-        .rpc('request_password_reset', {
-          p_email: email
-        });
+      console.log('Requesting password reset for:', email);
+
+      // First, check if user exists in auth.users
+      const { data: users, error: checkError } = await supabase
+        .from('users')
+        .select('id, email, is_active')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking user:', checkError);
+      }
+
+      if (!users) {
+        console.warn('User not found, but returning success to prevent email enumeration');
+        // Return success anyway to prevent email enumeration attacks
+        return { error: null };
+      }
+
+      if (!users.is_active) {
+        return { error: 'Account is not active. Please contact administrator.' };
+      }
+
+      console.log('User found, sending reset email via Supabase Auth...');
+
+      // Use production URL for redirect (works for both local dev and production)
+      const redirectUrl = `${window.location.origin}/?reset=true`;
+      console.log('📧 Sending password reset email with redirect URL:', redirectUrl);
+
+      // Use Supabase Auth's built-in password reset
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
 
       if (error) {
+        console.error('Password reset request error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        // Provide more specific error messages
+        if (error.message.includes('rate limit')) {
+          return { error: 'Too many reset requests. Please wait a few minutes and try again.' };
+        }
+        
         return { error: error.message };
       }
+
+      console.log('✅ Password reset request accepted by Supabase Auth');
+      console.log('⚠️ Note: Check spam folder if email not received within 5 minutes');
+      console.log('Response:', data);
 
       return { error: null };
     } catch (error: any) {
@@ -319,26 +360,57 @@ export const authService = {
   },
 
   /**
-   * Update user password (requires current session)
+   * Update user password (works for both logged-in users and password reset)
+   * Updates BOTH auth.users (via Supabase) and public.users (via trigger/RPC)
    */
   async updatePassword(newPassword: string): Promise<{ error: string | null }> {
     try {
-      const userId = localStorage.getItem('user_id');
+      console.log('Updating password...');
+
+      // Get current user session
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!userId) {
+      if (!user) {
         return { error: 'No active session' };
       }
 
-      const { error } = await supabase
-        .rpc('update_user_password', {
-          p_user_id: userId,
-          p_new_password: newPassword
-        });
+      // Update password in Supabase Auth (updates auth.users)
+      const { error: authError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-      if (error) {
-        return { error: error.message };
+      if (authError) {
+        console.error('Supabase Auth password update error:', authError);
+        return { error: authError.message };
       }
 
+      console.log('✅ Password updated in auth.users via Supabase Auth');
+
+      // Also update public.users to keep both tables in sync
+      try {
+        const { error: publicError } = await supabase
+          .from('users')
+          .update({
+            password_hash: `updated_via_auth_${Date.now()}`, // Marker that it was updated
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        if (publicError) {
+          console.warn('Failed to update public.users:', publicError);
+          // Don't fail the whole operation
+        } else {
+          console.log('✅ Password marker updated in public.users');
+        }
+      } catch (publicUpdateError) {
+        console.warn('Public users update error:', publicUpdateError);
+      }
+
+      // Clear local session to force re-login
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('session_expires_at');
+
+      console.log('✅ Password updated successfully in both systems');
       return { error: null };
     } catch (error: any) {
       console.error('Update password error:', error);

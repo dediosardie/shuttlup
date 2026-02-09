@@ -445,7 +445,7 @@ function App() {
           </div>
 
           {/* Center: Search */}
-           <div className="hidden md:flex flex-1 max-w-md mx-4">
+           {/* <div className="hidden md:flex flex-1 max-w-md mx-4">
             <div className="relative w-full">
               <input
                 type="search"
@@ -456,7 +456,7 @@ function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-          </div> 
+          </div>  */}
 
           {/* Right: Notifications + Profile */}
           <div className="flex items-center gap-2">

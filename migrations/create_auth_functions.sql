@@ -94,7 +94,8 @@ $$;
 
 -- ============================================================================
 -- FUNCTION: update_user_password
--- Updates a user's password
+-- Updates a user's password in BOTH auth.users AND public.users
+-- This ensures complete sync between Supabase Auth and custom auth tables
 -- ============================================================================
 CREATE OR REPLACE FUNCTION update_user_password(
   p_user_id UUID,
@@ -104,13 +105,44 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_email TEXT;
+  v_found BOOLEAN := FALSE;
 BEGIN
+  -- Get user email from public.users
+  SELECT email INTO v_email FROM users WHERE id = p_user_id;
+  
+  IF v_email IS NULL THEN
+    RAISE EXCEPTION 'User not found';
+  END IF;
+
+  -- Update auth.users (Supabase Auth) password
+  -- This updates the authentication system
+  BEGIN
+    UPDATE auth.users
+    SET encrypted_password = crypt(p_new_password, gen_salt('bf')),
+        updated_at = CURRENT_TIMESTAMP,
+        confirmation_token = NULL,
+        email_confirmed_at = COALESCE(email_confirmed_at, CURRENT_TIMESTAMP)
+    WHERE id = p_user_id;
+    
+    v_found := FOUND;
+  EXCEPTION WHEN OTHERS THEN
+    -- Log error but continue to update public.users
+    RAISE WARNING 'Failed to update auth.users: %', SQLERRM;
+  END;
+
+  -- Update public.users (custom table) password hash
+  -- This keeps our custom table in sync
   UPDATE users
   SET password_hash = crypt(p_new_password, gen_salt('bf')),
       updated_at = CURRENT_TIMESTAMP
   WHERE id = p_user_id;
+  
+  v_found := v_found OR FOUND;
 
-  RETURN FOUND;
+  -- Return true if either table was updated
+  RETURN v_found;
 END;
 $$;
 

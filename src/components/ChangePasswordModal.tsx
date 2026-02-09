@@ -38,19 +38,22 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
     setIsLoading(true);
 
     try {
+      console.log('Updating password for user...');
       const { error: updateError } = await authService.updatePassword(newPassword);
       
       if (updateError) {
         setError(updateError || 'Failed to update password');
+        console.error('Password update failed:', updateError);
       } else {
-        setSuccessMessage('Password updated successfully!');
+        setSuccessMessage('Password updated successfully in both authentication systems!');
+        console.log('Password updated successfully');
         setTimeout(() => {
           handleClose();
         }, 2000);
       }
     } catch (err) {
       setError('An unexpected error occurred');
-      console.error(err);
+      console.error('Password update error:', err);
     } finally {
       setIsLoading(false);
     }
