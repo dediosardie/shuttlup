@@ -26,17 +26,16 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     console.log('🔍 Hash params:', window.location.hash);
     
     // Check if URL has reset parameter (from Supabase email link)
-    const urlParams = new URLSearchParams(window.location.search);
-    const isReset = urlParams.get('reset');
+    const currentPath = window.location.pathname;
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
 
-    console.log('🔍 Reset param:', isReset);
+    console.log('🔍 Current path:', currentPath);
     console.log('🔍 Access token exists:', !!accessToken);
     console.log('🔍 Type:', type);
 
-    if (isReset === 'true' || (type === 'recovery' && accessToken)) {
+    if (currentPath === '/reset-password' || (type === 'recovery' && accessToken)) {
       console.log('✅ Password reset mode detected - showing reset form');
       setViewMode('reset-password');
       setSuccessMessage('Enter your new password below');

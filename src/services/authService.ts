@@ -321,7 +321,7 @@ export const authService = {
       console.log('User found, sending reset email via Supabase Auth...');
 
       // Use production URL for redirect (works for both local dev and production)
-      const redirectUrl = `${window.location.origin}/?reset=true`;
+      const redirectUrl = `${window.location.origin}/reset-password`;
       console.log('📧 Sending password reset email with redirect URL:', redirectUrl);
 
       // Use Supabase Auth's built-in password reset

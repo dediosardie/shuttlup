@@ -52,9 +52,9 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       // Check if this is a password reset flow (bypass auth check for faster load)
-      const urlParams = new URLSearchParams(window.location.search);
+      const currentPath = window.location.pathname;
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const isPasswordReset = urlParams.get('reset') === 'true' || hashParams.get('type') === 'recovery';
+      const isPasswordReset = currentPath === '/reset-password' || hashParams.get('type') === 'recovery';
       
       if (isPasswordReset) {
         console.log('Password reset detected - bypassing auth check');
