@@ -130,6 +130,7 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
             <option value="maintenance_team">Maintenance Team</option>
             <option value="fleet_manager">Fleet Manager</option>
             <option value="administration">Administration</option>
+            <option value="passenger">Passenger</option>
             <option value="client_company_liaison">Client Company Liaison</option>
           </Select>
           <p className="mt-1 text-xs text-text-muted">
@@ -169,6 +170,8 @@ export default function UserForm({ onSave, onUpdate, initialData }: UserFormProp
           <li><strong>Maintenance Manager:</strong> Manage maintenance, incidents, insurance</li>
           <li><strong>Driver:</strong> View assigned trips, log fuel transactions</li>
           <li><strong>Viewer:</strong> Read-only access to reports and data</li>
+          <li><strong>Passenger:</strong> Access to personal trip information and booking</li>
+          <li><strong>Client Company Liaison:</strong> Manage client company interactions and communications</li>
         </ul>
       </div>
 
