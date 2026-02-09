@@ -1,3 +1,35 @@
+# Don't redirect static assets - serve them as-is
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*.js"
+  to = "/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*.css"
+  to = "/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*.svg"
+  to = "/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*.png"
+  to = "/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*.json"
+  to = "/:splat"
+  status = 200
+
+# SPA routing - redirect all other routes to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"

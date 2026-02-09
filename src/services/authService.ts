@@ -51,31 +51,9 @@ export const authService = {
    */
   async signIn(email: string, password: string): Promise<AuthResponse> {
     try {
-      // Call the database function to verify credentials
-      const { data, error } = await supabase
-        .rpc('authenticate_user', {
-          p_email: email,
-          p_password: password
-        });
+      console.log('🔐 Signing in with Supabase Auth...');
 
-      if (error) {
-        console.error('Authentication error:', error);
-        return {
-          user: null,
-          error: error.message,
-        };
-      }
-
-      if (!data || data.length === 0) {
-        return {
-          user: null,
-          error: 'Invalid email or password',
-        };
-      }
-
-      const user = data[0];
-
-      // Check if email is confirmed in Supabase Auth by attempting to sign in
+      // Sign in using Supabase Auth (checks auth.users)
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
@@ -85,22 +63,39 @@ export const authService = {
         console.error('Supabase Auth sign-in error:', authError);
         return {
           user: null,
-          error: 'Authentication failed. Please confirm your email address before signing in.',
+          error: authError.message === 'Invalid login credentials' 
+            ? 'Invalid email or password' 
+            : 'Authentication failed. Please try again.',
         };
       }
 
-      // Check if email is confirmed
-      if (authData.user && !authData.user.email_confirmed_at) {
-        // Sign out from Supabase Auth since email is not confirmed
+      if (!authData.user) {
+        return {
+          user: null,
+          error: 'Invalid email or password',
+        };
+      }
+
+      console.log('✅ Supabase Auth successful, fetching user details...');
+
+      // Fetch user details from public.users
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (userError || !userData) {
+        console.error('User fetch error:', userError);
         await supabase.auth.signOut();
         return {
           user: null,
-          error: 'Please confirm your email address before signing in. Check your inbox for the confirmation link.',
+          error: 'User account not found',
         };
       }
 
       // Check if user account is active
-      if (!user.is_active) {
+      if (!userData.is_active) {
         // Sign out from Supabase Auth since account is not active
         await supabase.auth.signOut();
         return {
@@ -109,8 +104,10 @@ export const authService = {
         };
       }
 
+      console.log('✅ User is active, creating session...');
+
       // Generate new session token (this will replace any existing session)
-      const sessionToken = `session_${user.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const sessionToken = `session_${userData.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const expiresAt = new Date(Date.now() + SESSION_DURATION).toISOString();
 
       // Update session_id in database (replaces existing session if any)
@@ -120,7 +117,7 @@ export const authService = {
           session_id: sessionToken,
           session_expires_at: expiresAt
         })
-        .eq('id', user.id);
+        .eq('id', userData.id);
 
       if (updateError) {
         console.error('Failed to update session:', updateError);
@@ -130,12 +127,14 @@ export const authService = {
         };
       }
 
+      console.log('✅ Session created successfully');
+
       // Store session in localStorage
-      console.log('Storing session - user role from DB:', user.role);
+      console.log('Storing session - user role from DB:', userData.role);
       localStorage.setItem('session_token', sessionToken);
-      localStorage.setItem('user_id', user.id);
-      localStorage.setItem('user_email', user.email);
-      localStorage.setItem('user_role', user.role);
+      localStorage.setItem('user_id', userData.id);
+      localStorage.setItem('user_email', userData.email);
+      localStorage.setItem('user_role', userData.role);
       localStorage.setItem('session_expires_at', expiresAt);
       console.log('Stored in localStorage - user_role:', localStorage.getItem('user_role'));
 
@@ -143,13 +142,7 @@ export const authService = {
       this.startSessionMonitoring();
 
       return {
-        user: {
-          id: user.id,
-          email: user.email,
-          full_name: user.full_name,
-          role: user.role,
-          is_active: user.is_active,
-        },
+        user: userData,
         error: null,
       };
     } catch (error: any) {
