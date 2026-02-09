@@ -17,6 +17,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [lastResetRequestTime, setLastResetRequestTime] = useState<number>(0);
+  const [resetCooldown, setResetCooldown] = useState<number>(0);
+  const [lastResetRequestTime, setLastResetRequestTime] = useState<number>(0);
+  const [resetCooldown, setResetCooldown] = useState<number>(0);
 
   // Check for password reset mode on mount
   useEffect(() => {
@@ -147,14 +151,44 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       return;
     }
 
+    // Check cooldown (60 seconds between requests)
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastResetRequestTime;
+    const cooldownPeriod = 60000; // 60 seconds
+    
+    if (timeSinceLastRequest < cooldownPeriod) {
+      const remainingSeconds = Math.ceil((cooldownPeriod - timeSinceLastRequest) / 1000);
+      setError(`Please wait ${remainingSeconds} seconds before requesting another reset email.`);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const { error: resetError } = await authService.forgotPassword(email);
       
       if (resetError) {
-        setError(resetError || 'Failed to send reset email');
+        // Handle rate limiting errors specifically
+        if (resetError.includes('13 seconds') || resetError.includes('rate limit')) {
+          setError('Too many requests. Please wait 60 seconds before trying again.');
+          setLastResetRequestTime(now);
+          setResetCooldown(60);
+          
+          // Start countdown
+          const countdownInterval = setInterval(() => {
+            setResetCooldown(prev => {
+              if (prev <= 1) {
+                clearInterval(countdownInterval);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          setError(resetError || 'Failed to send reset email');
+        }
       } else {
+        setLastResetRequestTime(now);
         setSuccessMessage('Password reset email sent! Check your inbox (and spam folder). The email may take a few minutes to arrive.');
         
         // Show additional help message
@@ -325,7 +359,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || resetCooldown > 0}
                 className="w-full px-4 py-3 bg-accent text-black font-medium rounded-lg hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {isLoading ? (
@@ -340,7 +374,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                   <>
                     {viewMode === 'login' && 'Sign In'}
                     {viewMode === 'signup' && 'Create Account'}
-                    {viewMode === 'forgot-password' && 'Send Reset Link'}
+                    {viewMode === 'forgot-password' && (resetCooldown > 0 ? `Wait ${resetCooldown}s` : 'Send Reset Link')}
                     {viewMode === 'reset-password' && 'Update Password'}
                   </>
                 )}
