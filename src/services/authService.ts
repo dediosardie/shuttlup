@@ -16,7 +16,7 @@ const SESSION_CHECK_INTERVAL = 60 * 1000; // Check every minute
 
 // Allowed email domains and specific emails
 const ALLOWED_EMAIL_DOMAINS = ['pg.com','dns.com.ph'];
-const ALLOWED_ADMIN_EMAILS = ['dediosardie11@gmail.com', 'advillanuevajr@gmail.com'];
+const ALLOWED_ADMIN_EMAILS = ['ardie.dedios@yahoo.com', 'analea.olvis@gmail.com', 'dediosardie11@gmail.com', 'advillanuevajr@gmail.com'];
 
 /**
  * Validate if email is allowed to sign up
