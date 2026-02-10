@@ -139,6 +139,13 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               return prev - 1;
             });
           }, 1000);
+        } else if (resetError.includes('not found') || resetError.includes('not registered')) {
+          // User not found - show error and redirect to login
+          setError(resetError);
+          setTimeout(() => {
+            setError('');
+            setViewMode('login');
+          }, 4000); // Show error for 4 seconds then redirect to login
         } else {
           setError(resetError || 'Failed to send reset email');
         }

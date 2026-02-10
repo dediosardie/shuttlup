@@ -49,17 +49,29 @@ DECLARE
   v_expires_at TIMESTAMP WITH TIME ZONE;
   v_is_active BOOLEAN;
 BEGIN
-  -- Check if user exists and is active
+  -- Check if user exists in public.users and is active
   SELECT u.id, u.full_name, u.is_active 
   INTO v_user_id, v_user_name, v_is_active
   FROM users u
   WHERE u.email = user_email;
   
   IF v_user_id IS NULL THEN
-    -- Don't reveal if email exists (security best practice)
+    -- User not found in public.users
     RETURN QUERY SELECT 
-      true, 
-      'If this email exists, a password reset link will be sent.'::TEXT,
+      false, 
+      'Email address not found. Please check your email or register for an account.'::TEXT,
+      NULL::TEXT,
+      NULL::UUID,
+      NULL::TEXT;
+    RETURN;
+  END IF;
+  
+  -- Check if user also exists in auth.users
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = v_user_id) THEN
+    -- User exists in public.users but not in auth.users (data inconsistency)
+    RETURN QUERY SELECT 
+      false, 
+      'Account error. Please contact administrator.'::TEXT,
       NULL::TEXT,
       NULL::UUID,
       NULL::TEXT;

@@ -70,25 +70,25 @@ serve(async (req) => {
     console.log('📋 Reset request result:', result)
 
     if (!result?.success) {
-      // Return success anyway to prevent email enumeration
-      console.log('⚠️ User not found or inactive, but returning success')
+      // User not found or inactive - return specific error
+      console.log('⚠️ User not found or inactive')
       return new Response(
         JSON.stringify({ 
-          success: true,
-          message: 'If this email exists, a password reset link will be sent.'
+          success: false,
+          error: result?.message || 'Email address not found. Please check your email or register for an account.'
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // If no token returned, user doesn't exist (return success to prevent enumeration)
+    // If no token returned, user doesn't exist
     if (!result.token) {
       return new Response(
         JSON.stringify({ 
-          success: true,
-          message: 'If this email exists, a password reset link will be sent.'
+          success: false,
+          error: 'Email address not found. Please check your email or register for an account.'
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
