@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent } from 'react';
 import { authService, validateEmailDomain } from '../services/authService';
 import logo from '../assets/logo.svg';
 
@@ -6,7 +6,7 @@ interface LoginPageProps {
   onLoginSuccess: () => void;
 }
 
-type ViewMode = 'login' | 'signup' | 'forgot-password' | 'reset-password';
+type ViewMode = 'login' | 'signup' | 'forgot-password';
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('login');
@@ -20,31 +20,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [lastResetRequestTime, setLastResetRequestTime] = useState<number>(0);
   const [resetCooldown, setResetCooldown] = useState<number>(0);
 
-  // Check for password reset mode on mount
-  useEffect(() => {
-    // Log current URL for debugging
-    console.log('🔍 Current URL:', window.location.href);
-    console.log('🔍 Search params:', window.location.search);
-    console.log('🔍 Hash params:', window.location.hash);
-    
-    // Check if URL has reset parameter (from Supabase email link)
-    const currentPath = window.location.pathname;
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
-
-    console.log('🔍 Current path:', currentPath);
-    console.log('🔍 Access token exists:', !!accessToken);
-    console.log('🔍 Type:', type);
-
-    if (currentPath === '/reset-password' || (type === 'recovery' && accessToken)) {
-      console.log('✅ Password reset mode detected - showing reset form');
-      setViewMode('reset-password');
-      setSuccessMessage('Enter your new password below');
-    } else {
-      console.log('ℹ️ No password reset detected - showing login form');
-    }
-  }, []);
+  // Remove the old reset password handling - now handled by ResetPasswordPage
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -110,25 +86,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             setViewMode('login');
             setSuccessMessage('');
           }, 5000);
-        }
-      } else if (viewMode === 'reset-password') {
-        // Use Supabase Auth to update password
-        const { error: updateError } = await authService.updatePassword(password);
-        
-        if (updateError) {
-          setError(updateError || 'Failed to reset password');
-        } else {
-          setSuccessMessage('Password reset successfully! Redirecting to login...');
-          
-          // Clear URL parameters
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-          setTimeout(() => {
-            setViewMode('login');
-            setSuccessMessage('');
-            setPassword('');
-            setConfirmPassword('');
-          }, 2000);
         }
       }
     } catch (err) {
@@ -227,13 +184,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               {viewMode === 'login' && 'Sign In'}
               {viewMode === 'signup' && 'Create Account'}
               {viewMode === 'forgot-password' && 'Reset Password'}
-              {viewMode === 'reset-password' && 'New Password'}
             </h2>
             <p className="text-text-secondary mt-1">
               {viewMode === 'login' && 'Enter your credentials to access your account'}
               {viewMode === 'signup' && 'Create a new account to get started'}
               {viewMode === 'forgot-password' && 'Enter your email to receive a reset link'}
-              {viewMode === 'reset-password' && 'Enter your new password'}
             </p>
           </div>
 
@@ -309,7 +264,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               {viewMode !== 'forgot-password' && (
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-2">
-                    {viewMode === 'reset-password' ? 'New Password' : 'Password'}
+                    Password
                   </label>
                   <input
                     id="password"
@@ -323,8 +278,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 </div>
               )}
 
-              {/* Confirm Password (only for signup and reset) */}
-              {(viewMode === 'signup' || viewMode === 'reset-password') && (
+              {/* Confirm Password (only for signup) */}
+              {viewMode === 'signup' && (
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-secondary mb-2">
                     Confirm Password
@@ -373,7 +328,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     {viewMode === 'login' && 'Sign In'}
                     {viewMode === 'signup' && 'Create Account'}
                     {viewMode === 'forgot-password' && (resetCooldown > 0 ? `Wait ${resetCooldown}s` : 'Send Reset Link')}
-                    {viewMode === 'reset-password' && 'Update Password'}
                   </>
                 )}
               </button>

@@ -290,123 +290,154 @@ export const authService = {
   },
 
   /**
-   * Send password reset request using Supabase Auth
-   * Supabase will send an email with a reset link
+   * Send password reset request using custom edge function + Resend API
+   * Uses custom recovery_token in public.users (Supabase Auth reset not working)
    */
   async forgotPassword(email: string): Promise<{ error: string | null }> {
     try {
-      console.log('Requesting password reset for:', email);
+      console.log('🔐 Requesting password reset via custom edge function for:', email);
 
-      // First, check if user exists in auth.users
-      const { data: users, error: checkError } = await supabase
-        .from('users')
-        .select('id, email, is_active')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Error checking user:', checkError);
-      }
-
-      if (!users) {
-        console.warn('User not found, but returning success to prevent email enumeration');
-        // Return success anyway to prevent email enumeration attacks
-        return { error: null };
-      }
-
-      if (!users.is_active) {
-        return { error: 'Account is not active. Please contact administrator.' };
-      }
-
-      console.log('User found, sending reset email via Supabase Auth...');
-
-      // Use production URL for redirect (works for both local dev and production)
-      const redirectUrl = `${window.location.origin}/reset-password`;
-      console.log('📧 Sending password reset email with redirect URL:', redirectUrl);
-
-      // Use Supabase Auth's built-in password reset
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
+      const appUrl = window.location.origin;
+      
+      // Call custom edge function to send reset email via Resend
+      // Note: Edge function requires authorization header
+      const { data, error } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: email.toLowerCase().trim(), appUrl },
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        }
       });
 
       if (error) {
-        console.error('Password reset request error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
+        console.error('❌ Edge function error:', error);
         
-        // Provide more specific error messages
-        if (error.message.includes('rate limit')) {
+        if (error.message?.includes('rate limit')) {
           return { error: 'Too many reset requests. Please wait a few minutes and try again.' };
         }
         
-        return { error: error.message };
+        return { error: error.message || 'Failed to send reset email' };
       }
 
-      console.log('✅ Password reset request accepted by Supabase Auth');
-      console.log('⚠️ Note: Check spam folder if email not received within 5 minutes');
-      console.log('Response:', data);
+      if (!data?.success) {
+        console.error('❌ Reset failed:', data);
+        return { error: data?.error || 'Failed to send reset email' };
+      }
+
+      console.log('✅ Password reset email sent via Resend API');
+      console.log('⚠️ Note: Email may take 1-5 minutes. Check spam folder if not received.');
 
       return { error: null };
     } catch (error: any) {
-      console.error('Forgot password error:', error);
+      console.error('❌ Forgot password error:', error);
+      return { error: error.message || 'An error occurred' };
+    }
+  },
+
+  /**
+   * Validate recovery token from password reset email
+   */
+  async validateRecoveryToken(token: string): Promise<{ valid: boolean; email?: string; error?: string }> {
+    try {
+      console.log('🔍 Validating recovery token...');
+
+      const { data, error } = await supabase
+        .rpc('validate_recovery_token', { token });
+
+      if (error) {
+        console.error('❌ Token validation error:', error);
+        return { valid: false, error: 'Failed to validate token' };
+      }
+
+      const result = data?.[0];
+      if (!result || !result.valid) {
+        return { 
+          valid: false, 
+          error: result?.message || 'Invalid or expired token' 
+        };
+      }
+
+      console.log('✅ Token is valid for user:', result.email);
+      return { valid: true, email: result.email };
+    } catch (error: any) {
+      console.error('❌ Validation error:', error);
+      return { valid: false, error: error.message || 'An error occurred' };
+    }
+  },
+
+  /**
+   * Reset password using recovery token from email
+   */
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<{ error: string | null }> {
+    try {
+      console.log('🔐 Resetting password with token...');
+
+      // Hash password using bcrypt
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+
+      const { data, error } = await supabase
+        .rpc('reset_password_with_token', { 
+          token, 
+          new_password_hash: passwordHash 
+        });
+
+      if (error) {
+        console.error('❌ Password reset error:', error);
+        return { error: 'Failed to reset password' };
+      }
+
+      const result = data?.[0];
+      if (!result || !result.success) {
+        return { error: result?.message || 'Failed to reset password' };
+      }
+
+      console.log('✅ Password reset successful');
+      
+      // Clear any existing session
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('session_expires_at');
+
+      return { error: null };
+    } catch (error: any) {
+      console.error('❌ Reset password error:', error);
       return { error: error.message || 'An error occurred' };
     }
   },
 
   /**
    * Update user password (works for both logged-in users and password reset)
-   * Updates BOTH auth.users (via Supabase) and public.users (via trigger/RPC)
+   * Updates auth.users via Supabase Auth, which automatically syncs to public.users via trigger
    */
   async updatePassword(newPassword: string): Promise<{ error: string | null }> {
     try {
-      console.log('Updating password...');
+      console.log('🔐 Updating password via Supabase Auth...');
 
-      // Get current user session
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return { error: 'No active session' };
-      }
-
-      // Update password in Supabase Auth (updates auth.users)
-      const { error: authError } = await supabase.auth.updateUser({
+      // Supabase Auth updateUser works for:
+      // 1. Logged-in users (uses current session)
+      // 2. Recovery flow (user clicked email link, has recovery session)
+      const { data, error: authError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (authError) {
-        console.error('Supabase Auth password update error:', authError);
-        return { error: authError.message };
+        console.error('❌ Password update error:', authError);
+        return { error: authError.message || 'Failed to update password' };
       }
 
-      console.log('✅ Password updated in auth.users via Supabase Auth');
-
-      // Also update public.users to keep both tables in sync
-      try {
-        const { error: publicError } = await supabase
-          .from('users')
-          .update({
-            password_hash: `updated_via_auth_${Date.now()}`, // Marker that it was updated
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
-
-        if (publicError) {
-          console.warn('Failed to update public.users:', publicError);
-          // Don't fail the whole operation
-        } else {
-          console.log('✅ Password marker updated in public.users');
-        }
-      } catch (publicUpdateError) {
-        console.warn('Public users update error:', publicUpdateError);
+      if (!data.user) {
+        return { error: 'No active session or recovery token' };
       }
 
-      // Clear local session to force re-login
+      console.log('✅ Password updated in auth.users (user ID:', data.user.id, ')');
+      console.log('✅ Trigger will automatically sync to public.users');
+
+      // Clear local session to force re-login (security best practice)
       localStorage.removeItem('session_token');
       localStorage.removeItem('session_expires_at');
 
-      console.log('✅ Password updated successfully in both systems');
       return { error: null };
     } catch (error: any) {
-      console.error('Update password error:', error);
+      console.error('❌ Update password error:', error);
       return { error: error.message || 'An error occurred' };
     }
   },

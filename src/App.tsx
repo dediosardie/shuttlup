@@ -2,19 +2,19 @@ import { useState, useEffect } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { Vehicle } from './types';
 import { notificationService, Notification } from './services/notificationService';
-import VehicleModule from './components/VehicleModule';
-import DriverModule from './components/DriverModule';
-import MaintenanceModule from './components/MaintenanceModule';
-import TripModule from './components/TripModule';
-import FuelTrackingModule from './components/FuelTrackingModule';
-import IncidentInsuranceModule from './components/IncidentInsuranceModule';
-import ComplianceDocumentModule from './components/ComplianceDocumentModule';
-import VehicleDisposalModule from './components/VehicleDisposalModule';
-import ReportingAnalyticsDashboard from './components/ReportingAnalyticsDashboard';
+// import VehicleModule from './components/VehicleModule';
+// import DriverModule from './components/DriverModule';
+// import MaintenanceModule from './components/MaintenanceModule';
+// import TripModule from './components/TripModule';
+// import FuelTrackingModule from './components/FuelTrackingModule';
+// import IncidentInsuranceModule from './components/IncidentInsuranceModule';
+// import ComplianceDocumentModule from './components/ComplianceDocumentModule';
+// import VehicleDisposalModule from './components/VehicleDisposalModule';
+// import ReportingAnalyticsDashboard from './components/ReportingAnalyticsDashboard';
 import UserModule from './components/UserModule';
 import PageRestrictionModule from './components/PageRestrictionModule';
-import LiveDriverTrackingMap from './components/LiveDriverTrackingMap';
-import DriverAttendancePage from './components/DriverAttendancePage';
+// import LiveDriverTrackingMap from './components/LiveDriverTrackingMap';
+// import DriverAttendancePage from './components/DriverAttendancePage';
 import TripRequestPage from './components/TripRequestPage';
 import BookingRequestPage from './components/BookingRequestPage';
 import RouteModule from './components/RouteModule';
@@ -22,6 +22,7 @@ import RatesModule from './components/RatesModule';
 import FleetDetailsModule from './components/FleetDetailsModule';
 import AuditLogPage from './components/AuditLogPage';
 import LoginPage from './components/LoginPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import { ProtectedRoute, RoleBadge } from './components/ProtectedRoute';
 import { useRoleAccess } from './hooks/useRoleAccess';
@@ -30,7 +31,26 @@ import { authService } from './services/authService';
 import { Module } from './config/rolePermissions';
 import { getRoleDefaultPage, checkRoleAccess } from './utils/roleRedirects';
 
-type ActiveModule = 'vehicles' | 'drivers' | 'maintenance' | 'trips' | 'fuel' | 'incidents' | 'compliance' | 'disposal' | 'reporting' | 'users' | 'page_restrictions' | 'live_tracking' | 'attendance' | 'trip_request' | 'booking_request' | 'routes' | 'rates' | 'fleet_details' | 'audit_logs';
+type ActiveModule = 
+// 'vehicles' 
+// | 'drivers' 
+// | 'maintenance' 
+// |  'trips' 
+// | 'fuel' 
+// | 'incidents' 
+// | 'compliance'
+//  | 'disposal' 
+//  | 'reporting' 
+ | 'users' 
+ | 'page_restrictions' 
+//  | 'live_tracking' 
+//  | 'attendance' 
+ | 'trip_request' 
+ | 'booking_request' 
+ | 'routes' 
+ | 'rates' 
+ | 'fleet_details' 
+ | 'audit_logs';
 
 function App() {
   const [user, setUser] = useState<any | null>(null);
@@ -51,13 +71,12 @@ function App() {
   // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
-      // Check if this is a password reset flow (bypass auth check for faster load)
-      const currentPath = window.location.pathname;
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const isPasswordReset = currentPath === '/reset-password' || hashParams.get('type') === 'recovery';
+      // Check if this is a password reset flow (custom token in URL)
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasResetToken = urlParams.get('token');
       
-      if (isPasswordReset) {
-        console.log('Password reset detected - bypassing auth check');
+      if (hasResetToken && window.location.pathname.includes('/reset-password')) {
+        console.log('Password reset flow detected - showing reset page');
         setUser(null);
         setAuthLoading(false);
         return;
@@ -129,15 +148,15 @@ function App() {
       
       // Map paths to activeModule values
       const pathToModule: Record<string, ActiveModule> = {
-        '/reports': 'reporting',
-        '/trips': 'trips',
+        // '/reports': 'reporting',
+        // '/trips': 'trips',
         '/trip-request': 'trip_request',
         '/booking-request': 'booking_request',
         '/routes': 'routes',
         '/rates': 'rates',
         '/fleet-details': 'fleet_details',
-        '/vehicles': 'vehicles',
-        '/live-tracking': 'live_tracking',
+        // '/vehicles': 'vehicles',
+        // '/live-tracking': 'live_tracking',
         '/audit-logs': 'audit_logs',
       };
 
@@ -155,24 +174,24 @@ function App() {
       if (!authLoading && !roleLoading && !pageAccessLoading && user && userRole) {
         // Map activeModule to paths
         const moduleToPat: Record<ActiveModule, string> = {
-          'reporting': '/reports',
-          'vehicles': '/vehicles',
-          'drivers': '/drivers',
-          'trips': '/trips',
+          // 'reporting': '/reports',
+          // 'vehicles': '/vehicles',
+          // 'drivers': '/drivers',
+          // 'trips': '/trips',
           'trip_request': '/trip-request',
           'booking_request': '/booking-request',
           'routes': '/routes',
           'rates': '/rates',
           'fleet_details': '/fleet-details',
-          'fuel': '/fuel',
-          'incidents': '/incidents',
-          'compliance': '/compliance',
-          'disposal': '/disposal',
-          'maintenance': '/maintenance',
+          // 'fuel': '/fuel',
+          // 'incidents': '/incidents',
+          // 'compliance': '/compliance',
+          // 'disposal': '/disposal',
+          // 'maintenance': '/maintenance',
           'users': '/users',
           'page_restrictions': '/page-restrictions',
-          'live_tracking': '/live-tracking',
-          'attendance': '/attendance',
+          // 'live_tracking': '/live-tracking',
+          // 'attendance': '/attendance',
           'audit_logs': '/audit-logs',
         };
 
@@ -226,6 +245,15 @@ function App() {
     window.dispatchEvent(new Event('storage'));
   };
 
+  const handlePasswordResetSuccess = () => {
+    // After password reset, clear user state and force login page
+    console.log('Password reset successful - redirecting to login');
+    setUser(null);
+    setAuthLoading(false);
+    // Clear URL parameters
+    window.history.pushState({}, '', '/');
+  };
+
   const handleDismissNotification = (id: number) => {
     setNotifications(notifications.filter(n => n.id !== id));
   };
@@ -256,6 +284,14 @@ function App() {
 
   // Show login page if not authenticated
   if (!user) {
+    // Check if this is a password reset request (custom token)
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasResetToken = urlParams.get('token');
+    
+    if (hasResetToken && window.location.pathname.includes('/reset-password')) {
+      return <ResetPasswordPage onResetSuccess={handlePasswordResetSuccess} />;
+    }
+    
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
@@ -370,11 +406,11 @@ function App() {
     //     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
     //   </svg>
     // )},
-    { id: 'incidents' as ActiveModule, module: 'incidents' as Module, path: '/incidents', label: 'Incidents', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    )},
+    // { id: 'incidents' as ActiveModule, module: 'incidents' as Module, path: '/incidents', label: 'Incidents', icon: (
+    //   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    //     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    //   </svg>
+    // )},
     { id: 'routes' as ActiveModule, module: 'maintenance' as Module, path: '/routes', label: 'Routes', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -434,24 +470,24 @@ function App() {
               </svg>
             </button>
             <h1 className="text-lg font-semibold text-text-primary hidden sm:block">
-              {activeModule === 'vehicles' && 'Vehicle Management'}
+              {/* {activeModule === 'vehicles' && 'Vehicle Management'}
               {activeModule === 'drivers' && 'Driver Management'}
               {activeModule === 'maintenance' && 'Maintenance'}
-              {activeModule === 'trips' && 'Trip Scheduling'}
+              {activeModule === 'trips' && 'Trip Scheduling'} */}
               {activeModule === 'trip_request' && 'Trip Request'}
               {activeModule === 'booking_request' && 'Booking Request'}
               {activeModule === 'routes' && 'Routes'}
               {activeModule === 'rates' && 'Rates'}
               {activeModule === 'fleet_details' && 'Fleet Details'}
-              {activeModule === 'live_tracking' && 'Live Driver Tracking'}
+              {/* {activeModule === 'live_tracking' && 'Live Driver Tracking'}
               {activeModule === 'fuel' && 'Fuel Tracking'}
               {activeModule === 'incidents' && 'Incidents & Insurance'}
               {activeModule === 'compliance' && 'Compliance Documents'}
               {activeModule === 'disposal' && 'Vehicle Disposal'}
-              {activeModule === 'reporting' && 'Reporting & Analytics'}
+              {activeModule === 'reporting' && 'Reporting & Analytics'} */}
               {activeModule === 'users' && 'User Management'}
               {activeModule === 'page_restrictions' && 'Page Restrictions'}
-              {activeModule === 'attendance' && 'Driver Attendance'}
+              {/* {activeModule === 'attendance' && 'Driver Attendance'} */}
               <span className="hidden">{vehicles.length}</span>
             </h1>
           </div>
@@ -791,7 +827,7 @@ function App() {
         {/* Main Content Area */}
         <main className="flex-1 overflow-auto bg-bg-primary">
           <div className="p-4 md:p-6 lg:p-8">
-            {activeModule === 'vehicles' && (
+            {/* {activeModule === 'vehicles' && (
               <ProtectedRoute pagePath="/vehicles">
                 <VehicleModule />
               </ProtectedRoute>
@@ -810,7 +846,7 @@ function App() {
               <ProtectedRoute pagePath="/trips">
                 <TripModule />
               </ProtectedRoute>
-            )}
+            )} */}
             {activeModule === 'trip_request' && (
               <ProtectedRoute pagePath="/trip-request">
                 <TripRequestPage />
@@ -836,7 +872,7 @@ function App() {
                 <FleetDetailsModule />
               </ProtectedRoute>
             )}
-            {activeModule === 'fuel' && (
+            {/* {activeModule === 'fuel' && (
               <ProtectedRoute pagePath="/fuel">
                 <FuelTrackingModule />
               </ProtectedRoute>
@@ -860,7 +896,7 @@ function App() {
               <ProtectedRoute pagePath="/reports">
                 <ReportingAnalyticsDashboard />
               </ProtectedRoute>
-            )}
+            )} */}
             {activeModule === 'users' && (
               <ProtectedRoute pagePath="/users">
                 <UserModule />
@@ -871,7 +907,7 @@ function App() {
                 <PageRestrictionModule />
               </ProtectedRoute>
             )}
-            {activeModule === 'live_tracking' && (
+            {/* {activeModule === 'live_tracking' && (
               <ProtectedRoute pagePath="/live-tracking">
                 <LiveDriverTrackingMap />
               </ProtectedRoute>
@@ -880,7 +916,7 @@ function App() {
               <ProtectedRoute pagePath="/attendance">
                 <DriverAttendancePage />
               </ProtectedRoute>
-            )}
+            )} */}
             {activeModule === 'audit_logs' && (
               <ProtectedRoute pagePath="/audit-logs">
                 <AuditLogPage />
