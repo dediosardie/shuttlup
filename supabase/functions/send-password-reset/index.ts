@@ -70,14 +70,14 @@ serve(async (req) => {
     console.log('📋 Reset request result:', result)
 
     if (!result?.success) {
-      // User not found or inactive - return specific error
+      // User not found or inactive - return 200 with success=false
       console.log('⚠️ User not found or inactive')
       return new Response(
         JSON.stringify({ 
           success: false,
           error: result?.message || 'Email address not found. Please check your email or register for an account.'
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -88,7 +88,7 @@ serve(async (req) => {
           success: false,
           error: 'Email address not found. Please check your email or register for an account.'
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 

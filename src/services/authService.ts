@@ -308,19 +308,22 @@ export const authService = {
         }
       });
 
+      // Check for HTTP errors (500, network issues, etc.)
       if (error) {
-        console.error('❌ Edge function error:', error);
-        
-        if (error.message?.includes('rate limit')) {
-          return { error: 'Too many reset requests. Please wait a few minutes and try again.' };
-        }
-        
-        return { error: error.message || 'Failed to send reset email' };
+        console.error('❌ Edge function HTTP error:', error);
+        return { error: error.message || 'Failed to send reset email. Please try again.' };
+      }
+
+      // Check response data for success/error
+      // Edge function returns 200 with success=false for user not found
+      if (data && !data.success) {
+        console.error('❌ Reset failed:', data.error);
+        return { error: data.error || 'Failed to send reset email.' };
       }
 
       if (!data?.success) {
-        console.error('❌ Reset failed:', data);
-        return { error: data?.error || 'Failed to send reset email' };
+        console.error('❌ Reset failed (unknown reason):', data);
+        return { error: 'Failed to send reset email. Please try again.' };
       }
 
       console.log('✅ Password reset email sent via Resend API');
