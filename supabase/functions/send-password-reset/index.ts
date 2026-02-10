@@ -93,9 +93,10 @@ serve(async (req) => {
       )
     }
 
-    // Build reset URL using production APP_URL
-    const resetUrl = `${APP_URL}/reset-password?token=${result.token}`
+    // Build reset URL using production APP_URL (use root path with token - SPA handles routing)
+    const resetUrl = `${APP_URL}/?token=${result.token}`
     console.log('🔗 Reset URL generated (using APP_URL):', APP_URL)
+    console.log('🔗 Full reset URL:', resetUrl)
     console.log('🔗 Token length:', result.token.length)
 
     // Create email HTML content
