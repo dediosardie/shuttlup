@@ -4,10 +4,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const APP_URL = Deno.env.get('APP_URL') || 'https://app.shuttlup.com' // Production URL
 
 interface PasswordResetRequest {
   email: string
-  appUrl: string
+  appUrl?: string // Optional - will use APP_URL env var if not provided
 }
 
 const corsHeaders = {
@@ -30,12 +31,12 @@ serve(async (req) => {
     console.log('🔐 Password reset edge function invoked:', new Date().toISOString())
     
     // Parse request body
-    const { email, appUrl }: PasswordResetRequest = await req.json()
+    const { email }: PasswordResetRequest = await req.json()
 
     // Validate inputs
-    if (!email || !appUrl) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields (email, appUrl)' }),
+        JSON.stringify({ error: 'Missing required field: email' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -92,9 +93,10 @@ serve(async (req) => {
       )
     }
 
-    // Build reset URL
-    const resetUrl = `${appUrl}/reset-password?token=${result.token}`
-    console.log('🔗 Reset URL generated (token length):', result.token.length)
+    // Build reset URL using production APP_URL
+    const resetUrl = `${APP_URL}/reset-password?token=${result.token}`
+    console.log('🔗 Reset URL generated (using APP_URL):', APP_URL)
+    console.log('🔗 Token length:', result.token.length)
 
     // Create email HTML content
     const emailHtml = `

@@ -75,7 +75,7 @@ function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const hasResetToken = urlParams.get('token');
       
-      if (hasResetToken && window.location.pathname.includes('/reset-password')) {
+      if (hasResetToken) {
         console.log('Password reset flow detected - showing reset page');
         setUser(null);
         setAuthLoading(false);
@@ -288,7 +288,7 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const hasResetToken = urlParams.get('token');
     
-    if (hasResetToken && window.location.pathname.includes('/reset-password')) {
+    if (hasResetToken) {
       return <ResetPasswordPage onResetSuccess={handlePasswordResetSuccess} />;
     }
     
