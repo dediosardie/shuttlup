@@ -250,8 +250,10 @@ function App() {
     console.log('Password reset successful - redirecting to login');
     setUser(null);
     setAuthLoading(false);
-    // Clear URL parameters
-    window.history.pushState({}, '', '/');
+    // Clear URL parameters and force full page reload to show login
+    window.history.replaceState({}, '', '/');
+    // Force page reload to ensure clean state
+    window.location.href = '/';
   };
 
   const handleDismissNotification = (id: number) => {

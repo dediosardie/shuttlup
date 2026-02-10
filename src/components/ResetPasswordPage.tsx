@@ -113,13 +113,16 @@ export default function ResetPasswordPage({ onResetSuccess }: ResetPasswordPageP
         setTimeout(() => {
           console.log('🔄 Redirecting to login page...');
           
+          // Clear token from URL and redirect
+          window.history.replaceState({}, '', '/');
+          
           if (onResetSuccess) {
             console.log('Using onResetSuccess callback');
             onResetSuccess();
           } else {
-            console.log('Using window.location.replace');
-            // Use replace to prevent back button issues
-            window.location.replace('/');
+            console.log('Using window.location.href for full page reload');
+            // Force full page reload to ensure login page shows
+            window.location.href = '/';
           }
         }, 2000);
       }
